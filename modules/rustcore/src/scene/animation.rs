@@ -328,6 +328,15 @@ impl Animation {
                     (Variant::Int(x), Variant::Float(y)) => {
                         Some(Variant::Float(*x as f64 + (y - *x as f64) * w))
                     }
+                    (Variant::Vector2(x), Variant::Vector2(y)) => {
+                        Some(Variant::Vector2(*x + (*y - *x) * w as f32))
+                    }
+                    (Variant::Vector3(x), Variant::Vector3(y)) => {
+                        Some(Variant::Vector3(*x + (*y - *x) * w as f32))
+                    }
+                    (Variant::Color(x), Variant::Color(y)) => {
+                        Some(Variant::Color(x.lerp(y, w as f32)))
+                    }
                     _ => Some(t.keys[i].value.clone()),
                 }
             }
