@@ -132,6 +132,7 @@ pub mod path_2d;
 pub mod sprite_2d;
 pub mod sprite_frames;
 pub mod style_box;
+pub mod surface_tool;
 pub mod texture_button;
 pub mod texture_classes;
 pub mod texture_misc;
