@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **681 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **682 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -213,6 +213,8 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/label_settings.rs` | `scene/resources/label_settings.*` | Line/paragraph spacing, font handle, size 16, colours, shadow defaults and the ordered stacked outline/shadow lists with the engine's add/move/remove/count/validation rules. Text layout not ported. **Non-differential** |
 | `scene/bone_map.rs` | `scene/resources/bone_map.*` | Profile revalidation (insert missing, drop unknown, null clears), mapping only existing profile bones, reverse lookup and count. **Non-differential** |
 | `scene/velocity_tracker_3d.rs` | `scene/3d/velocity_tracker_3d.*` | Four-frame position history, same-frame overwrite, physics/idle time conversion, 0.2 s averaging window and reset; ticks passed explicitly (no Engine singleton). **Non-differential** |
+| `scene/visual_instance_3d.rs` | `scene/3d/visual_instance_3d.*` | VisualInstance layers/sorting (bits 1..20) and GeometryInstance shadow/materials/visibility range/transparency clamp/LOD/instance params/cull margin/custom AABB/lightmap/GI/occlusion state. RIDs not ported. **Non-differential** |
+| `scene/occluder_3d.rs` | `scene/3d/{marker_3d,occluder_instance_3d}.*` | Marker gizmo extents 0.25, array/quad/box/sphere/polygon occluders with size/radius clamps, and the instance's occluder handle, bake mask (bits 1..20) and simplification distance. Baking not ported. **Non-differential** |
 | `scene/camera_3d.rs` | `scene/3d/camera_3d.*` (state) | Projection modes, FOV `1..=179`, size `> CMP_EPSILON`, near/far/frustum/h/v offsets, keep-aspect, cull mask `0xfffff` with layer bits `1..=20`, environment/attributes/compositor handles, Doppler mode and current flag. Projection matrix/RID not ported. **Non-differential** |
 | `scene/compositor.rs` | `scene/resources/compositor.*` | CompositorEffect defaults (enabled, post-transparent stage, four access flags) and the ordered effect list. Render callbacks/RIDs not ported. **Non-differential** |
 | `scene/shader.rs` | `scene/resources/shader.*` | Mode enum (6 modes + Max), code/include path, and indexed default textures where null at index 0 erases the parameter while other indices keep a null entry. Compilation/uniforms/RID not ported. **Non-differential** |
