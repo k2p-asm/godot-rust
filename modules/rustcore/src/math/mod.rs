@@ -3,6 +3,7 @@ pub mod aabb;
 pub mod audio_frame;
 pub mod basis;
 pub mod color;
+pub mod convex_hull;
 pub mod color_names;
 pub mod delaunay_3d;
 pub mod disjoint_set;
