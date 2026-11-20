@@ -36,6 +36,25 @@ pub fn unset_environment(variable: &str) -> bool {
     true
 }
 
+/// `OS::get_cmdline_args`: the process arguments, including the executable.
+pub fn get_cmdline_args() -> Vec<String> {
+    std::env::args().collect()
+}
+
+/// `OS::get_cmdline_user_args`: the arguments after a lone `--`.
+pub fn get_cmdline_user_args() -> Vec<String> {
+    let mut found = false;
+    let mut user_args = Vec::new();
+    for arg in std::env::args().skip(1) {
+        if found {
+            user_args.push(arg);
+        } else if arg == "--" {
+            found = true;
+        }
+    }
+    user_args
+}
+
 /// `OS::get_environment_list`: every variable name, sorted (the engine returns
 /// the platform's order; sorting makes it deterministic).
 pub fn get_environment_list() -> Vec<String> {
