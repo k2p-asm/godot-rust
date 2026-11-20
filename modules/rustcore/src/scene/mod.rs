@@ -39,6 +39,7 @@ pub mod immediate_mesh;
 pub mod importer_mesh;
 pub mod importer_mesh_instance_3d;
 pub mod label;
+pub mod line_edit;
 pub mod label_settings;
 pub mod light_2d;
 pub mod light_3d;
