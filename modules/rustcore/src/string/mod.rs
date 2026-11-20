@@ -7,3 +7,4 @@ pub mod gstring;
 pub mod num;
 pub mod string_name;
 pub mod char_utils;
+pub mod escape;
