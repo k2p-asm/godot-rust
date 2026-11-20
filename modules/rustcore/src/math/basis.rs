@@ -728,6 +728,42 @@ impl Basis {
 
         acc_rot
     }
+    /// `Basis::set_euler_scale`: rotation and scale in one step. The engine
+    /// writes the scale on the diagonal and then rotates, which is `R * S`
+    /// (the columns carry the scale), not the left-multiplying `scale()`.
+    pub fn from_euler_scale(euler: Vector3, scale: Vector3, order: EulerOrder) -> Self {
+        let mut b = Self::from_euler(euler, order);
+        b.scale_columns(scale);
+        b
+    }
+
+    /// `Basis(quaternion, scale)`: `R * S`, matching `set_quaternion_scale`.
+    pub fn from_quaternion_scale(quaternion: Quaternion, scale: Vector3) -> Self {
+        let mut b = Self::from_quaternion(quaternion);
+        b.scale_columns(scale);
+        b
+    }
+
+    /// Multiplies each column by the matching scale component (`M -> M * S`),
+    /// which is what the engine's rotation-then-scale constructors produce.
+    pub fn scale_columns(&mut self, scale: Vector3) {
+        let s = [scale.x, scale.y, scale.z];
+        for i in 0..3 {
+            self.set_column(i, self.get_column(i) * s[i]);
+        }
+    }
+
+    /// `Basis::get_euler_normalized`: Euler angles of the rotation part alone,
+    /// complementing `get_scale`. A negative determinant is flipped so the
+    /// result is a proper rotation.
+    pub fn get_euler_normalized(&self, order: EulerOrder) -> Vector3 {
+        let mut m = self.orthonormalized();
+        if m.determinant() < 0.0 {
+            m.scale(Vector3::new(-1.0, -1.0, -1.0));
+        }
+        m.get_euler(order)
+    }
+
     /// Decomposes the basis into Euler angles for the given order
     /// (`Basis::get_euler`). The epsilon matches the engine's, which truncates
     /// angles within ~0.04 degrees to the canonical singularity form.
@@ -1068,5 +1104,30 @@ mod tests {
         let c = Basis::from_euler(e, EulerOrder::YXZ);
         let q = Quaternion::from_euler(e);
         assert!(c.is_equal_approx(&Basis::from_quaternion(q)));
+    }
+
+    #[test]
+    fn euler_scale_and_normalized_euler_roundtrip() {
+        let e = Vector3::new(0.2, -0.7, 1.1);
+        let s = Vector3::new(2.0, 3.0, 0.5);
+        let b = Basis::from_euler_scale(e, s, EulerOrder::YXZ);
+
+        // The scale comes back from the column lengths.
+        let got = b.get_scale();
+        assert!((got.x - 2.0).abs() < 1e-4, "{got:?}");
+        assert!((got.y - 3.0).abs() < 1e-4, "{got:?}");
+        assert!((got.z - 0.5).abs() < 1e-4, "{got:?}");
+
+        // And the normalized Euler matches the rotation part.
+        let back = b.get_euler_normalized(EulerOrder::YXZ);
+        let expected = Basis::from_euler(e, EulerOrder::YXZ);
+        assert!(Basis::from_euler(back, EulerOrder::YXZ).is_equal_approx(&expected));
+
+        // A mirrored basis still yields a proper rotation.
+        let mut mirrored = Basis::from_euler(e, EulerOrder::XYZ);
+        mirrored.scale(Vector3::new(-1.0, 1.0, 1.0));
+        let e2 = mirrored.get_euler_normalized(EulerOrder::XYZ);
+        let rebuilt = Basis::from_euler(e2, EulerOrder::XYZ);
+        assert!((rebuilt.determinant() - 1.0).abs() < 1e-4);
     }
 }
