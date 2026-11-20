@@ -5,6 +5,7 @@
 
 pub mod camera_2d;
 pub mod animation;
+pub mod animation_player;
 pub mod canvas_item;
 pub mod curve;
 pub mod curve_2d;
