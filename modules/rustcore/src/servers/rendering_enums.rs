@@ -17,6 +17,24 @@ pub const MAX_CURSORS: i32 = 8;
 pub const MAX_2D_DIRECTIONAL_LIGHTS: i32 = 8;
 pub const MAX_MESH_SURFACES: i32 = 256;
 
+/// `TextureType`, in declaration order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i32)]
+pub enum TextureType {
+    Type2D,
+    Layered,
+    Type3D,
+}
+
+/// `TextureLayeredType`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i32)]
+pub enum TextureLayeredType {
+    Array2D,
+    Cubemap,
+    CubemapArray,
+}
+
 /// `CanvasItemTextureFilter`, in declaration order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i32)]
@@ -129,6 +147,16 @@ mod tests {
         assert_eq!(CanvasLightShadowFilter::Pcf5 as i32, 1);
         assert_eq!(CanvasLightShadowFilter::Pcf13 as i32, 2);
         assert_eq!(CanvasLightShadowFilter::Max as i32, CanvasLightShadowFilter::COUNT);
+    }
+
+    #[test]
+    fn texture_types_follow_declaration_order() {
+        assert_eq!(TextureType::Type2D as i32, 0);
+        assert_eq!(TextureType::Layered as i32, 1);
+        assert_eq!(TextureType::Type3D as i32, 2);
+        assert_eq!(TextureLayeredType::Array2D as i32, 0);
+        assert_eq!(TextureLayeredType::Cubemap as i32, 1);
+        assert_eq!(TextureLayeredType::CubemapArray as i32, 2);
     }
 
     #[test]
