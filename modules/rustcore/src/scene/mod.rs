@@ -6,6 +6,7 @@
 pub mod camera_2d;
 pub mod animation;
 pub mod animation_library;
+pub mod aspect_ratio_container;
 pub mod animation_mixer;
 pub mod animation_player;
 pub mod bit_map;

@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **617 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **620 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -210,6 +210,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/light_occluder_2d.rs` | `scene/2d/light_occluder_2d.*` | OccluderPolygon2D vertices/closed/cull mode and LightOccluder2D polygon reference, light mask and SDF flag. RIDs/SDF generation not ported. **Non-differential** |
 | `io/json.rs` | `core/io/json.*` (parse/stringify) | Engine token rules (floats for all numbers), full string escapes incl. surrogate pairs, exact error messages/lines, 1024 depth cap; stringify with sorted keys, optional indent, 14-magnitude fixed precision, `0.0`/inf/NaN handling and JSON escaping. Native conversions not ported. **Non-differential** |
 | `scene/panel_container.rs` | `scene/gui/panel_container.*` (layout) | Minimum `child + stylebox` and child cell `Rect2(offset, size - style_min)` with the child's flags via `Control::layout_in_cell`. Theme lookup not ported. **Non-differential** |
+| `scene/aspect_ratio_container.rs` | `scene/gui/aspect_ratio_container.*` (layout) | Ratio box `(ratio, 1)` scaled by width-controls-height / height-controls-width / fit / cover, raised to the child minimum, then aligned by the two alignment fractions; minimum size is the largest child minimum. RTL and the proportional-TextureRect warning not ported. **Non-differential** |
 | `scene/parallax_2d.rs` | `scene/2d/parallax_2d.*` (state) | Scroll scale/offset, screen offset, repeat size (`maxf(0)`) and times (`>= 1`), ±10,000,000 limits, autoscroll, follow/ignore flags, group name. Camera-moved math not ported. **Non-differential** |
 | `scene/visible_on_screen_notifier_2d.rs` | `scene/2d/visible_on_screen_notifier_2d.*` (state) | Notifier rect/show-rect/on-screen hook and enabler enable modes with default `..` path. Server registration/signals not ported. **Non-differential** |
 | `servers/audio_effect_{reverb,delay,chorus,distortion,eq,filter,misc}.rs` | `servers/audio/effects/audio_effect_*.{h,cpp}` | Parameter state for every effect class: Reverb, Delay, Chorus, Distortion, EQ6/10/21, the five filters, Limiter, Amplify, Panner, StereoEnhance, Compressor and PitchShift. Defaults copied from each constructor or in-class initialiser; setters replicate the C++ validation (EQ band index, chorus voice index/count, pitch scale `> 0`, oversampling `>= 4`, FFT size `< MAX`, reverb feedback `0..0.98`) and never clamp where the engine does not. `Amplify` converts through `linear_to_db`/`db_to_linear`. DSP/`process()` is not ported. **Non-differential** (`AudioEffect` is `Resource`-backed) |
