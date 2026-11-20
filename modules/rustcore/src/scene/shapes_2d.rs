@@ -328,6 +328,58 @@ impl SeparationRayShape2D {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct ConvexPolygonShape2D {
+    points: Vec<Vector2>,
+}
+
+impl ConvexPolygonShape2D {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Computes the hull first; fewer than three hull points is rejected and
+    /// the stored polygon is left untouched (`ERR_FAIL_COND(hull.size() < 3)`).
+    pub fn set_point_cloud(&mut self, cloud: &[Vector2]) -> bool {
+        let hull = crate::math::geometry_2d::convex_hull(cloud);
+        if hull.len() < 3 {
+            return false;
+        }
+        self.points = hull;
+        true
+    }
+
+    /// `set_points` stores the vertices as given, with no validation.
+    pub fn set_points(&mut self, points: Vec<Vector2>) {
+        self.points = points;
+    }
+
+    pub fn get_points(&self) -> &[Vector2] {
+        &self.points
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ConcavePolygonShape2D {
+    segments: Vec<Vector2>,
+}
+
+impl ConcavePolygonShape2D {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The engine forwards the pairs untouched; an odd count is only skipped
+    /// when drawing.
+    pub fn set_segments(&mut self, segments: Vec<Vector2>) {
+        self.segments = segments;
+    }
+
+    pub fn get_segments(&self) -> &[Vector2] {
+        &self.segments
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,6 +486,47 @@ mod tests {
         w.set_distance(5.0);
         assert_eq!(w.get_distance(), 5.0);
         assert_eq!(w.get_enclosing_radius(), 5.0);
+    }
+
+    #[test]
+    fn convex_and_concave_polygon_shapes() {
+        let mut c = ConvexPolygonShape2D::new();
+        assert!(c.get_points().is_empty());
+        // Two points cannot form a hull: rejected, nothing stored.
+        assert!(!c.set_point_cloud(&[Vector2::ZERO, Vector2::new(1.0, 0.0)]));
+        assert!(c.get_points().is_empty());
+
+        // Square plus an interior point: the hull keeps the four corners, and
+        // `Geometry2D::convex_hull` repeats the first point at the end.
+        let cloud = [
+            Vector2::ZERO,
+            Vector2::new(4.0, 0.0),
+            Vector2::new(4.0, 4.0),
+            Vector2::new(0.0, 4.0),
+            Vector2::new(2.0, 2.0),
+        ];
+        assert!(c.set_point_cloud(&cloud));
+        assert_eq!(c.get_points().len(), 5);
+        assert_eq!(c.get_points()[0], *c.get_points().last().unwrap());
+        for p in &cloud[..4] {
+            assert!(c.get_points().contains(p), "missing {p:?}");
+        }
+        assert!(!c.get_points().contains(&Vector2::new(2.0, 2.0)));
+
+        // set_points itself accepts anything.
+        c.set_points(vec![Vector2::ZERO, Vector2::new(1.0, 1.0)]);
+        assert_eq!(c.get_points().len(), 2);
+
+        let mut k = ConcavePolygonShape2D::new();
+        assert!(k.get_segments().is_empty());
+        k.set_segments(vec![
+            Vector2::ZERO,
+            Vector2::new(1.0, 0.0),
+            Vector2::new(1.0, 0.0),
+            Vector2::new(1.0, 1.0),
+        ]);
+        assert_eq!(k.get_segments().len(), 4);
+        assert_eq!(k.get_segments()[3], Vector2::new(1.0, 1.0));
     }
 
     #[test]
