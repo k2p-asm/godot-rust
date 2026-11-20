@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **347 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **353 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -148,6 +148,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/transform_2d.rs` | `core/math/transform_2d.*` | complete |
 | `scene/node_2d.rs` | `scene/2d/node_2d.*` (data half) | position/rotation/scale/skew with the engine's lazy decomposition of `set_transform`, zero-scale clamp, `rotate`/`translate`, relative transform. `set_rotation_scale_and_skew` is differential (`t2.rs_skew*`). Parenting and notifications need the object layer |
 | `scene/canvas_item.rs` | `scene/main/canvas_item.*` (data half) | visibility with the cached `parent_visible_in_tree`, `modulate`/`self_modulate` + ancestor composition, `z_index` range check (`-4096..=4096`) and relative composition, `y_sort_enabled`, `show_behind_parent`, clip mode, light/visibility layers |
+| `scene/polygon_2d.rs` | `scene/2d/polygon_2d.*` (data + outline triangulation) | outline, hole list accessors, UVs, vertex colors, texture offset/scale/rotation, invert + border (clamped at 0), poly-as-lines, internal vertex count. `triangulate_outer` uses the ported ear clipping; the hole-aware Clipper path is rejected rather than ignored. **Non-differential** |
 | `scene/line_2d.rs` | `scene/2d/line_2d.*` (state + width) | point list with append/insert/remove, closed flag, width clamped at 0, `Curve`-scaled `get_width_at`, default color, optional `Gradient`, joint/cap modes, sharp limit, round precision (>= 1) and texture mode. `_draw`'s triangle strip is not ported. **Non-differential** |
 | `scene/camera_2d.rs` | `scene/2d/camera_2d.*` (state + `align`) | anchor mode, offset, zoom with zero rejection and reciprocal `zoom_scale`, drag margins/offsets/enabled flags, limits, smoothing speeds (clamped to >= 0), process callback, and the `align` position math for both anchors, plus `get_camera_transform` with limit clamping (left/right/top/bottom, split-centering when the viewport is wider than the limits), zoom on the basis, optional rotation and position smoothing, and `get_camera_screen_center`. **Non-differential** |
 | `scene/node.rs` | `scene/main/node.*` (data half) | name/owner, unique-name flag, `ProcessMode` (inherit/pausable/when-paused/always/disabled) with the engine resolution and `can_process` matrix, process/physics priorities, thread group, `inside_tree`, and the eight `set_process*` flags. **Non-differential** (needs the tree/object layer) |
