@@ -9,6 +9,7 @@
 //! no `Variant`/`String`/`Object` ever appears here.
 
 pub mod ffi;
+pub mod io;
 pub mod math;
 pub mod string;
 pub mod object;

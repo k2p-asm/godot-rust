@@ -125,6 +125,26 @@ pub fn stringify(value: &Variant) -> GoString {
         Variant::Int(i) => GoString::from_str(&i.to_string()),
         Variant::Float(f) => crate::string::num::num_float(*f, -1),
         Variant::String(s) => s.clone(),
+        Variant::Vector2(v) => GoString::from_str(&format!(
+            "({}, {})",
+            crate::string::num::num_float(v.x as f64, -1).as_string(),
+            crate::string::num::num_float(v.y as f64, -1).as_string()
+        )),
+        Variant::Vector2i(v) => GoString::from_str(&format!("({}, {})", v.x, v.y)),
+        Variant::Vector3(v) => GoString::from_str(&format!(
+            "({}, {}, {})",
+            crate::string::num::num_float(v.x as f64, -1).as_string(),
+            crate::string::num::num_float(v.y as f64, -1).as_string(),
+            crate::string::num::num_float(v.z as f64, -1).as_string()
+        )),
+        Variant::Vector3i(v) => GoString::from_str(&format!("({}, {}, {})", v.x, v.y, v.z)),
+        Variant::Color(c) => GoString::from_str(&format!(
+            "({}, {}, {}, {})",
+            crate::string::num::num_float(c.r as f64, -1).as_string(),
+            crate::string::num::num_float(c.g as f64, -1).as_string(),
+            crate::string::num::num_float(c.b as f64, -1).as_string(),
+            crate::string::num::num_float(c.a as f64, -1).as_string()
+        )),
         _ => GoString::new(),
     }
 }
