@@ -35,6 +35,7 @@ pub mod node_2d;
 pub mod node_3d;
 pub mod node2d_extras;
 pub mod node_tree;
+pub mod panel_container;
 pub mod parallax_layer;
 pub mod path_2d;
 pub mod sprite_2d;
