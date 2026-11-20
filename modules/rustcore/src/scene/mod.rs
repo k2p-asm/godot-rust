@@ -24,6 +24,7 @@ pub mod canvas_item;
 pub mod canvas_item_material;
 pub mod compositor;
 pub mod control;
+pub mod video_stream_player;
 pub mod voxel_gi;
 pub mod graph_edit;
 pub mod graph_node;
