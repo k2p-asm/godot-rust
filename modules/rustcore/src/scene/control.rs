@@ -50,6 +50,7 @@ pub struct ControlData {
     /// `[left, top, right, bottom]` in pixels.
     offsets: [f32; 4],
     custom_min_size: Vector2,
+    content_min_size: Vector2,
     size_flags_horizontal: u32,
     size_flags_vertical: u32,
     stretch_ratio: f32,
@@ -67,6 +68,7 @@ impl ControlData {
             anchors: [0.0, 0.0, 0.0, 0.0],
             offsets: [0.0, 0.0, 0.0, 0.0],
             custom_min_size: Vector2::ZERO,
+            content_min_size: Vector2::ZERO,
             size_flags_horizontal: size_flags::FILL,
             size_flags_vertical: size_flags::FILL,
             stretch_ratio: 1.0,
@@ -124,6 +126,23 @@ impl ControlData {
 
     pub fn get_custom_minimum_size(&self) -> Vector2 {
         self.custom_min_size
+    }
+
+    /// The content minimum the control reports (text, texture, children...).
+    pub fn set_content_minimum_size(&mut self, size: Vector2) {
+        self.content_min_size = Vector2::new(size.x.max(0.0), size.y.max(0.0));
+    }
+
+    pub fn get_content_minimum_size(&self) -> Vector2 {
+        self.content_min_size
+    }
+
+    /// get_combined_minimum_size: component-wise max of custom and content.
+    pub fn get_combined_minimum_size(&self) -> Vector2 {
+        Vector2::new(
+            self.custom_min_size.x.max(self.content_min_size.x),
+            self.custom_min_size.y.max(self.content_min_size.y),
+        )
     }
 
     pub fn set_size_flags_horizontal(&mut self, flags: u32) {
@@ -192,11 +211,12 @@ impl ControlData {
         let bottom = parent_size.y * self.anchors[3] + self.offsets[3];
 
         let mut size = Vector2::new(right - left, bottom - top);
-        if size.x < self.custom_min_size.x {
-            size.x = self.custom_min_size.x;
+        let min = self.get_combined_minimum_size();
+        if size.x < min.x {
+            size.x = min.x;
         }
-        if size.y < self.custom_min_size.y {
-            size.y = self.custom_min_size.y;
+        if size.y < min.y {
+            size.y = min.y;
         }
         Rect2::new(Vector2::new(left, top), size)
     }
@@ -214,6 +234,8 @@ impl ControlData {
     /// `set_size`: solves `size = (anchor2 - anchor1) * parent + (offset2 - offset1)`
     /// for the right/bottom offsets, keeping the left/top corner fixed.
     pub fn set_size(&mut self, size: Vector2, parent_size: Vector2) {
+        let min = self.get_combined_minimum_size();
+        let size = Vector2::new(size.x.max(min.x), size.y.max(min.y));
         self.offsets[2] = self.offsets[0] + size.x
             - parent_size.x * (self.anchors[2] - self.anchors[0]);
         self.offsets[3] = self.offsets[1] + size.y
@@ -362,6 +384,28 @@ mod tests {
             Vector2::new(10.0, 10.0),
         );
         assert_eq!(r.size.x, 80.0);
+    }
+
+    #[test]
+    fn combined_minimum_propagates_into_size_and_rect() {
+        let mut c = ControlData::new();
+        c.set_custom_minimum_size(Vector2::new(20.0, 40.0));
+        c.set_content_minimum_size(Vector2::new(30.0, 10.0));
+        // Component-wise max.
+        assert_eq!(c.get_combined_minimum_size(), Vector2::new(30.0, 40.0));
+
+        // set_size below the minimum is clamped up.
+        c.set_anchors_preset(LayoutPreset::TopLeft);
+        c.set_size(Vector2::new(5.0, 5.0), PARENT);
+        assert_eq!(c.get_size(PARENT), Vector2::new(30.0, 40.0));
+
+        // And the rect never reports less than the combined minimum.
+        let r = c.get_rect(PARENT);
+        assert_eq!(r.size, Vector2::new(30.0, 40.0));
+
+        // Negative content minimums are clamped at zero.
+        c.set_content_minimum_size(Vector2::new(-5.0, -5.0));
+        assert_eq!(c.get_content_minimum_size(), Vector2::ZERO);
     }
 
     #[test]
