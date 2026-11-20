@@ -22,6 +22,7 @@ pub mod canvas_item;
 pub mod canvas_item_material;
 pub mod compositor;
 pub mod control;
+pub mod cpu_particles_2d;
 pub mod curve;
 pub mod curve_2d;
 pub mod curve_3d;
