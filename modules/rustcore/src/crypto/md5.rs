@@ -178,6 +178,8 @@ mod tests {
         // The engine hashes buffers with trailing zero bytes too.
         assert_eq!(md5(&[0u8; 16]), md5(&[0u8; 16]));
         assert_ne!(md5(&[0u8; 16]), md5(&[0u8; 17]));
+        // Cross-checked against Python's hashlib.
+        assert_eq!(md5_hex(&[0u8; 16]), "4ae71336e44bf9bf79d2752e234818a5");
     }
 
     #[test]
