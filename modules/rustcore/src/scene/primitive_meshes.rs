@@ -1154,6 +1154,266 @@ pub fn generate_torus_arrays(
     arrays
 }
 
+/// `PrismMesh::create_mesh_array`.
+pub fn generate_prism_arrays(
+    size: Vector3,
+    left_to_right: f32,
+    subdivide_w: i32,
+    subdivide_h: i32,
+    subdivide_d: i32,
+    add_uv2: bool,
+    uv2_padding: f32,
+) -> GeneratedArrays {
+    let onethird = 1.0f32 / 3.0;
+    let twothirds = 2.0f32 / 3.0;
+
+    let horizontal_total = size.x + size.z + 2.0 * uv2_padding;
+    let width_h = size.x / horizontal_total;
+    let depth_h = size.z / horizontal_total;
+    let padding_h = uv2_padding / horizontal_total;
+
+    let vertical_total = (size.y + size.y + size.z) + (3.0 * uv2_padding);
+    let height_v = size.y / vertical_total;
+    let depth_v = size.z / vertical_total;
+    let padding_v = uv2_padding / vertical_total;
+
+    let start_pos = size * -0.5;
+    let mut arrays = GeneratedArrays::default();
+    let mut uv2s: Vec<crate::math::vector2::Vector2> = Vec::new();
+    let mut point = 0i32;
+    let mut thisrow = 0i32;
+    let mut prevrow = 0i32;
+
+    // Front + back.
+    let mut y = start_pos.y;
+    for j in 0..=(subdivide_h + 1) {
+        let scale = j as f32 / (subdivide_h + 1) as f32;
+        let scaled_size_x = size.x * scale;
+        let start_x = start_pos.x + (1.0 - scale) * size.x * left_to_right;
+        let offset_front = (1.0 - scale) * onethird * left_to_right;
+        let offset_back = (1.0 - scale) * onethird * (1.0 - left_to_right);
+
+        let mut v = j as f32;
+        let v2 = scale;
+        v /= 2.0 * (subdivide_h + 1) as f32;
+
+        let mut x = 0.0f32;
+        for i in 0..=(subdivide_w + 1) {
+            let mut u = i as f32;
+            let u2 = i as f32 / (subdivide_w + 1) as f32;
+            u /= 3.0 * (subdivide_w + 1) as f32;
+            u *= scale;
+
+            // Front.
+            arrays
+                .points
+                .push(Vector3::new(start_x + x, -y, -start_pos.z));
+            arrays.normals.push(Vector3::new(0.0, 0.0, 1.0));
+            arrays.tangents.extend_from_slice(&[1.0, 0.0, 0.0, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(offset_front + u, v));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    u2 * scale * width_h,
+                    v2 * height_v,
+                ));
+            }
+            point += 1;
+
+            // Back.
+            arrays.points.push(Vector3::new(
+                start_x + scaled_size_x - x,
+                -y,
+                start_pos.z,
+            ));
+            arrays.normals.push(Vector3::new(0.0, 0.0, -1.0));
+            arrays.tangents.extend_from_slice(&[-1.0, 0.0, 0.0, 1.0]);
+            arrays.uvs.push(crate::math::vector2::Vector2::new(
+                twothirds + offset_back + u,
+                v,
+            ));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    u2 * scale * width_h,
+                    height_v + padding_v + v2 * height_v,
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j == 1 {
+                let i2 = i * 2;
+                arrays.indices.push(prevrow + i2);
+                arrays.indices.push(thisrow + i2);
+                arrays.indices.push(thisrow + i2 - 2);
+                arrays.indices.push(prevrow + i2 + 1);
+                arrays.indices.push(thisrow + i2 + 1);
+                arrays.indices.push(thisrow + i2 - 1);
+            } else if i > 0 && j > 0 {
+                let i2 = i * 2;
+                push_quad(
+                    &mut arrays.indices,
+                    prevrow + i2 - 2,
+                    prevrow + i2,
+                    thisrow + i2 - 2,
+                    prevrow + i2,
+                    thisrow + i2,
+                    thisrow + i2 - 2,
+                );
+                push_quad(
+                    &mut arrays.indices,
+                    prevrow + i2 - 1,
+                    prevrow + i2 + 1,
+                    thisrow + i2 - 1,
+                    prevrow + i2 + 1,
+                    thisrow + i2 + 1,
+                    thisrow + i2 - 1,
+                );
+            }
+
+            x += scale * size.x / (subdivide_w + 1) as f32;
+        }
+
+        y += size.y / (subdivide_h + 1) as f32;
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    // Left + right.
+    let normal_left = Vector3::new(-size.y, size.x * left_to_right, 0.0).normalized();
+    let normal_right = Vector3::new(size.y, size.x * (1.0 - left_to_right), 0.0).normalized();
+
+    y = start_pos.y;
+    thisrow = point;
+    prevrow = 0;
+    for j in 0..=(subdivide_h + 1) {
+        let scale = j as f32 / (subdivide_h + 1) as f32;
+        let left = start_pos.x + (size.x * (1.0 - scale) * left_to_right);
+        let right = left + (size.x * scale);
+
+        let mut v = j as f32;
+        let v2 = scale;
+        v /= 2.0 * (subdivide_h + 1) as f32;
+
+        let mut z = start_pos.z;
+        for i in 0..=(subdivide_d + 1) {
+            let mut u = i as f32;
+            let u2 = i as f32 / (subdivide_d + 1) as f32;
+            u /= 3.0 * (subdivide_d + 1) as f32;
+
+            // Right.
+            arrays.points.push(Vector3::new(right, -y, -z));
+            arrays.normals.push(normal_right);
+            arrays.tangents.extend_from_slice(&[0.0, 0.0, -1.0, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(onethird + u, v));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    width_h + padding_h + u2 * depth_h,
+                    v2 * height_v,
+                ));
+            }
+            point += 1;
+
+            // Left.
+            arrays.points.push(Vector3::new(left, -y, z));
+            arrays.normals.push(normal_left);
+            arrays.tangents.extend_from_slice(&[0.0, 0.0, 1.0, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(u, 0.5 + v));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    width_h + padding_h + u2 * depth_h,
+                    height_v + padding_v + v2 * height_v,
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j > 0 {
+                let i2 = i * 2;
+                push_quad(
+                    &mut arrays.indices,
+                    prevrow + i2 - 2,
+                    prevrow + i2,
+                    thisrow + i2 - 2,
+                    prevrow + i2,
+                    thisrow + i2,
+                    thisrow + i2 - 2,
+                );
+                push_quad(
+                    &mut arrays.indices,
+                    prevrow + i2 - 1,
+                    prevrow + i2 + 1,
+                    thisrow + i2 - 1,
+                    prevrow + i2 + 1,
+                    thisrow + i2 + 1,
+                    thisrow + i2 - 1,
+                );
+            }
+
+            z += size.z / (subdivide_d + 1) as f32;
+        }
+
+        y += size.y / (subdivide_h + 1) as f32;
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    // Bottom.
+    let mut z = start_pos.z;
+    thisrow = point;
+    prevrow = 0;
+    for j in 0..=(subdivide_d + 1) {
+        let mut v = j as f32;
+        let v2 = v / (subdivide_d + 1) as f32;
+        v /= 2.0 * (subdivide_d + 1) as f32;
+
+        let mut x = start_pos.x;
+        for i in 0..=(subdivide_w + 1) {
+            let mut u = i as f32;
+            let u2 = u / (subdivide_w + 1) as f32;
+            u /= 3.0 * (subdivide_w + 1) as f32;
+
+            arrays.points.push(Vector3::new(x, start_pos.y, -z));
+            arrays.normals.push(Vector3::new(0.0, -1.0, 0.0));
+            arrays.tangents.extend_from_slice(&[1.0, 0.0, 0.0, 1.0]);
+            arrays.uvs.push(crate::math::vector2::Vector2::new(
+                twothirds + u,
+                0.5 + v,
+            ));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    u2 * width_h,
+                    2.0 * (height_v + padding_v) + v2 * depth_v,
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j > 0 {
+                arrays.indices.push(prevrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i);
+                arrays.indices.push(thisrow + i - 1);
+            }
+
+            x += size.x / (subdivide_w + 1) as f32;
+        }
+
+        z += size.z / (subdivide_d + 1) as f32;
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    if add_uv2 {
+        arrays.uv2s = uv2s;
+    }
+    arrays
+}
+
 #[derive(Clone, Debug)]
 pub struct PlaneMeshData {
     pub params: PrimitiveMeshParams,
@@ -1321,6 +1581,21 @@ impl PrismMeshData {
 
     pub fn get_subdivide_depth(&self) -> i32 {
         self.subdivide_d
+    }
+}
+
+impl PrismMeshData {
+    /// `_create_mesh_array` with this mesh's parameters.
+    pub fn generate_arrays(&self) -> GeneratedArrays {
+        generate_prism_arrays(
+            self.size,
+            self.left_to_right,
+            self.subdivide_w,
+            self.subdivide_h,
+            self.subdivide_d,
+            self.params.add_uv2,
+            self.params.uv2_padding * self.params.texel_size,
+        )
     }
 }
 
@@ -1562,6 +1837,62 @@ mod tests {
         assert_eq!(c.get_bottom_radius(), 2.0);
         assert!(!c.is_cap_top());
         assert!(!c.is_cap_bottom());
+    }
+
+    #[test]
+    fn prism_arrays_counts_and_extents() {
+        // No subdivisions: 2×2 grid for front/back (8), 2×2 for left/right (8)
+        // and 2×2 for the bottom (4).
+        let a = generate_prism_arrays(Vector3::new(1.0, 1.0, 1.0), 0.5, 0, 0, 0, false, 0.0);
+        assert_eq!(a.points.len(), 20);
+        assert_eq!(a.indices.len(), 6 + 12 + 6);
+        assert!(a.uv2s.is_empty());
+        assert!(a.indices.iter().all(|&i| (0..20).contains(&i)));
+        // Everything sits inside the requested box.
+        assert!(a.points.iter().all(|p| {
+            p.x.abs() <= 0.5 + 1e-6 && p.y.abs() <= 0.5 + 1e-6 && p.z.abs() <= 0.5 + 1e-6
+        }));
+        // The front face looks at +Z and the back at -Z.
+        assert_eq!(a.normals[0], Vector3::new(0.0, 0.0, 1.0));
+        assert_eq!(a.normals[1], Vector3::new(0.0, 0.0, -1.0));
+    }
+
+    #[test]
+    fn prism_arrays_subdivisions_and_uv2() {
+        let a = generate_prism_arrays(Vector3::new(2.0, 2.0, 2.0), 0.25, 1, 1, 1, true, 0.1);
+        assert_eq!(a.uv2s.len(), a.points.len());
+        assert!(a.uv2s.iter().all(|uv| uv.x >= 0.0 && uv.y >= 0.0));
+        assert!(a.indices.iter().all(|&i| (0..a.points.len() as i32).contains(&i)));
+        // Subdividing adds more vertices than the default prism.
+        let b = generate_prism_arrays(Vector3::new(2.0, 2.0, 2.0), 0.25, 1, 1, 1, false, 0.0);
+        assert!(b.points.len() > 20);
+
+        // The wrapper uses the mesh's parameters.
+        let mut p = PrismMeshData::new();
+        p.set_subdivide_width(1);
+        p.set_subdivide_height(1);
+        p.set_subdivide_depth(1);
+        p.params.add_uv2 = true;
+        let arrays = p.generate_arrays();
+        assert_eq!(arrays.points.len(), b.points.len());
+        assert_eq!(arrays.uv2s.len(), arrays.points.len());
+    }
+
+    #[test]
+    fn prism_left_to_right_shifts_the_apex() {
+        // left_to_right = 1 puts the apex on the left side; 0 on the right.
+        let left = generate_prism_arrays(Vector3::new(1.0, 1.0, 1.0), 1.0, 0, 0, 0, false, 0.0);
+        // The apex row is the third pair of vertices (row j = 1, i = 0).
+        let left_apex_front = left.points[4].x;
+        assert!((left_apex_front - (-0.5)).abs() < 1e-6);
+
+        let right = generate_prism_arrays(Vector3::new(1.0, 1.0, 1.0), 0.0, 0, 0, 0, false, 0.0);
+        // With left_to_right = 0 the front apex stays at the base's left edge.
+        assert!((right.points[4].x - (-0.5)).abs() < 1e-6);
+        // The left side normal flips with the slope.
+        let left_side = generate_prism_arrays(Vector3::new(1.0, 2.0, 1.0), 1.0, 0, 0, 0, false, 0.0);
+        let right_side = generate_prism_arrays(Vector3::new(1.0, 2.0, 1.0), 0.0, 0, 0, 0, false, 0.0);
+        assert_ne!(left_side.normals[8], right_side.normals[8]);
     }
 
     #[test]
