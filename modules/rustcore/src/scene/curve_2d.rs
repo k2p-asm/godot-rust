@@ -241,6 +241,67 @@ impl Curve2D {
         self.baked_points = baked;
     }
 
+    /// `_bake_segment2d`: angle-based tessellation. Inserts midpoints where the
+    /// curve turns more than `tolerance` degrees, recursing `max_depth` times.
+    #[allow(clippy::too_many_arguments)]
+    fn tessellate_segment(
+        out: &mut BTreeMap<u32, Vector2>,
+        begin: f32,
+        end: f32,
+        a: Vector2,
+        a_out: Vector2,
+        b: Vector2,
+        b_in: Vector2,
+        depth: i32,
+        max_depth: i32,
+        tolerance: f32,
+    ) {
+        let mp = begin + (end - begin) * 0.5;
+        let beg = bezier(a, a + a_out, b + b_in, b, begin);
+        let mid = bezier(a, a + a_out, b + b_in, b, mp);
+        let endp = bezier(a, a + a_out, b + b_in, b, end);
+
+        let na = (mid - beg).normalized();
+        let nb = (endp - mid).normalized();
+        let dp = na.dot(nb);
+
+        if dp < crate::math::funcs::deg_to_rad(tolerance as f64).cos() as f32 {
+            out.insert(mp.to_bits(), mid);
+        }
+
+        if depth < max_depth {
+            Self::tessellate_segment(out, begin, mp, a, a_out, b, b_in, depth + 1, max_depth, tolerance);
+            Self::tessellate_segment(out, mp, end, a, a_out, b, b_in, depth + 1, max_depth, tolerance);
+        }
+    }
+
+    /// `tessellate`: polyline for display; `max_stages` limits the recursion and
+    /// `tolerance` is in degrees.
+    pub fn tessellate(&self, max_stages: i32, tolerance: f32) -> Vec<Vector2> {
+        if self.points.is_empty() {
+            return Vec::new();
+        }
+        if self.points.len() == 1 {
+            return vec![self.points[0].position];
+        }
+
+        let mut out = vec![self.points[0].position];
+        for i in 0..self.points.len() - 1 {
+            let a = self.points[i].position;
+            let a_out = self.points[i].out;
+            let b = self.points[i + 1].position;
+            let b_in = self.points[i + 1].in_;
+
+            let mut mid = BTreeMap::new();
+            Self::tessellate_segment(&mut mid, 0.0, 1.0, a, a_out, b, b_in, 0, max_stages, tolerance);
+            for (_, p) in mid {
+                out.push(p);
+            }
+            out.push(b);
+        }
+        out
+    }
+
     pub fn get_baked_length(&mut self) -> f32 {
         if self.baked_dirty {
             self.bake();
@@ -433,6 +494,44 @@ mod tests {
         // Baking follows the bulge, so the arc is longer than the chord.
         let len = c.get_baked_length();
         assert!(len > 10.1, "{len}");
+    }
+
+    #[test]
+    fn tessellate_straight_line_is_two_points() {
+        let c = straight(10.0);
+        assert_eq!(c.tessellate(5, 4.0).len(), 2);
+    }
+
+    #[test]
+    fn tessellate_curved_segment_adds_points() {
+        let mut c = Curve2D::new();
+        c.add_point(Vector2::ZERO);
+        c.add_point(Vector2::new(10.0, 0.0));
+        c.set_point_out(0, Vector2::new(0.0, 10.0));
+        c.set_point_in(1, Vector2::new(0.0, 10.0));
+
+        let poly = c.tessellate(5, 4.0);
+        assert!(poly.len() > 3, "got {} points", poly.len());
+        // First and last are the control points.
+        assert_eq!(poly[0], Vector2::ZERO);
+        assert!((poly[poly.len() - 1] - Vector2::new(10.0, 0.0)).length() < 1e-5);
+        // The polyline follows the bulge.
+        assert!(poly.iter().any(|p| p.y > 1.0));
+    }
+
+    #[test]
+    fn tessellate_without_stages_still_splits_once() {
+        let mut c = Curve2D::new();
+        c.add_point(Vector2::ZERO);
+        c.add_point(Vector2::new(10.0, 0.0));
+        c.set_point_out(0, Vector2::new(0.0, 10.0));
+        c.set_point_in(1, Vector2::new(0.0, 10.0));
+
+        // The top-level call inserts the midpoint if the turn is over the
+        // tolerance, even with no recursion left.
+        assert_eq!(c.tessellate(0, 4.0).len(), 3);
+        // With a tolerance that no turn exceeds, nothing is inserted.
+        assert_eq!(c.tessellate(0, 179.0).len(), 2);
     }
 
     #[test]
