@@ -23,6 +23,8 @@ pub mod canvas_item;
 pub mod canvas_item_material;
 pub mod compositor;
 pub mod control;
+pub mod canvas_extras;
+pub mod joints_3d;
 pub mod visual_helpers;
 pub mod collision_object;
 pub mod toggles;
