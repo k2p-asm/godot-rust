@@ -244,6 +244,66 @@ pub fn from_native(value: &Variant) -> Variant {
             "Color",
             vec![f64v(c.r), f64v(c.g), f64v(c.b), f64v(c.a)],
         ),
+        Variant::PackedByteArray(values) => args_object(
+            "PackedByteArray",
+            values.iter().map(|v| Variant::Int(*v as i64)).collect(),
+        ),
+        Variant::PackedInt32Array(values) => args_object(
+            "PackedInt32Array",
+            values.iter().map(|v| Variant::Int(*v as i64)).collect(),
+        ),
+        Variant::PackedInt64Array(values) => args_object(
+            "PackedInt64Array",
+            values.iter().map(|v| Variant::Int(*v)).collect(),
+        ),
+        Variant::PackedFloat32Array(values) => args_object(
+            "PackedFloat32Array",
+            values.iter().map(|v| Variant::Float(*v as f64)).collect(),
+        ),
+        Variant::PackedFloat64Array(values) => {
+            args_object("PackedFloat64Array", values.iter().map(|v| Variant::Float(*v)).collect())
+        }
+        Variant::PackedStringArray(values) => args_object(
+            "PackedStringArray",
+            values.iter().map(|v| Variant::String(v.clone())).collect(),
+        ),
+        Variant::PackedVector2Array(values) => {
+            let mut args = Vec::with_capacity(values.len() * 2);
+            for v in values {
+                args.push(f64v(v.x));
+                args.push(f64v(v.y));
+            }
+            args_object("PackedVector2Array", args)
+        }
+        Variant::PackedVector3Array(values) => {
+            let mut args = Vec::with_capacity(values.len() * 3);
+            for v in values {
+                args.push(f64v(v.x));
+                args.push(f64v(v.y));
+                args.push(f64v(v.z));
+            }
+            args_object("PackedVector3Array", args)
+        }
+        Variant::PackedColorArray(values) => {
+            let mut args = Vec::with_capacity(values.len() * 4);
+            for v in values {
+                args.push(f64v(v.r));
+                args.push(f64v(v.g));
+                args.push(f64v(v.b));
+                args.push(f64v(v.a));
+            }
+            args_object("PackedColorArray", args)
+        }
+        Variant::PackedVector4Array(values) => {
+            let mut args = Vec::with_capacity(values.len() * 4);
+            for v in values {
+                args.push(f64v(v.x));
+                args.push(f64v(v.y));
+                args.push(f64v(v.z));
+                args.push(f64v(v.w));
+            }
+            args_object("PackedVector4Array", args)
+        }
         Variant::Array(items) => {
             Variant::Array(items.iter().map(from_native).collect())
         }
@@ -404,6 +464,71 @@ fn decode_args(type_name: &str, args: &[Variant]) -> Variant {
             .map(|v| Color::new(v.x, v.y, v.z, v.w))
             .map(Variant::Color)
             .unwrap_or(Variant::Nil),
+        "PackedByteArray" => Variant::PackedByteArray(
+            args.iter().map(|v| v.to_int() as u8).collect(),
+        ),
+        "PackedInt32Array" => Variant::PackedInt32Array(
+            args.iter().map(|v| v.to_int() as i32).collect(),
+        ),
+        "PackedInt64Array" => {
+            Variant::PackedInt64Array(args.iter().map(|v| v.to_int()).collect())
+        }
+        "PackedFloat32Array" => Variant::PackedFloat32Array(
+            args.iter().map(|v| v.to_float() as f32).collect(),
+        ),
+        "PackedFloat64Array" => {
+            Variant::PackedFloat64Array(args.iter().map(|v| v.to_float()).collect())
+        }
+        "PackedStringArray" => {
+            let mut values = Vec::with_capacity(args.len());
+            for arg in args {
+                match arg {
+                    Variant::String(s) => values.push(s.clone()),
+                    _ => return Variant::Nil,
+                }
+            }
+            Variant::PackedStringArray(values)
+        }
+        "PackedVector2Array" if args.len() % 2 == 0 => {
+            let mut values = Vec::with_capacity(args.len() / 2);
+            for pair in args.chunks(2) {
+                match vec2(pair) {
+                    Some(v) => values.push(v),
+                    None => return Variant::Nil,
+                }
+            }
+            Variant::PackedVector2Array(values)
+        }
+        "PackedVector3Array" if args.len() % 3 == 0 => {
+            let mut values = Vec::with_capacity(args.len() / 3);
+            for triple in args.chunks(3) {
+                match vec3(triple) {
+                    Some(v) => values.push(v),
+                    None => return Variant::Nil,
+                }
+            }
+            Variant::PackedVector3Array(values)
+        }
+        "PackedColorArray" if args.len() % 4 == 0 => {
+            let mut values = Vec::with_capacity(args.len() / 4);
+            for quad in args.chunks(4) {
+                match vec4(quad) {
+                    Some(v) => values.push(Color::new(v.x, v.y, v.z, v.w)),
+                    None => return Variant::Nil,
+                }
+            }
+            Variant::PackedColorArray(values)
+        }
+        "PackedVector4Array" if args.len() % 4 == 0 => {
+            let mut values = Vec::with_capacity(args.len() / 4);
+            for quad in args.chunks(4) {
+                match vec4(quad) {
+                    Some(v) => values.push(v),
+                    None => return Variant::Nil,
+                }
+            }
+            Variant::PackedVector4Array(values)
+        }
         "Dictionary" if args.len() % 2 == 0 => {
             let mut map: HashMap<StringName, Variant> = HashMap::new();
             for pair in args.chunks(2) {
@@ -543,6 +668,42 @@ mod tests {
             dict.get(&StringName::new("v")),
             Some(&Variant::Vector2(Vector2::new(1.0, 2.0)))
         );
+    }
+
+    #[test]
+    fn packed_arrays_round_trip() {
+        let values = vec![
+            Variant::PackedByteArray(vec![0, 1, 255]),
+            Variant::PackedInt32Array(vec![-3, 0, 7]),
+            Variant::PackedInt64Array(vec![-9_000_000_000, 1]),
+            Variant::PackedFloat32Array(vec![1.5, -2.25]),
+            Variant::PackedFloat64Array(vec![0.1, 1e300]),
+            Variant::PackedStringArray(vec![
+                GoString::from_str("a"),
+                GoString::from_str("b"),
+            ]),
+            Variant::PackedVector2Array(vec![Vector2::new(1.0, 2.0), Vector2::new(-3.0, 0.5)]),
+            Variant::PackedVector3Array(vec![Vector3::new(1.0, 2.0, 3.0)]),
+            Variant::PackedColorArray(vec![Color::new(0.1, 0.2, 0.3, 0.4)]),
+            Variant::PackedVector4Array(vec![Vector4::new(1.0, 2.0, 3.0, 4.0)]),
+        ];
+
+        for value in values {
+            assert_eq!(to_native(&from_native(&value)), value);
+        }
+    }
+
+    #[test]
+    fn packed_array_size_mismatches_become_nil() {
+        // Vector2 arrays need an even argument count.
+        let bad = args_object(
+            "PackedVector2Array",
+            vec![Variant::Float(1.0), Variant::Float(2.0), Variant::Float(3.0)],
+        );
+        assert_eq!(to_native(&bad), Variant::Nil);
+        // String arrays need string elements.
+        let bad = args_object("PackedStringArray", vec![Variant::Int(1)]);
+        assert_eq!(to_native(&bad), Variant::Nil);
     }
 
     #[test]
