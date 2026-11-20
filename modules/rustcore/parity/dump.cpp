@@ -333,6 +333,10 @@ int main() {
 		out("t2.mul", (t * s).xform(Vector2(0.3f, 0.9f)));
 		out("t2.origin", s.get_origin());
 		out("t2.interp", s.interpolate_with(t, 0.35f).xform(Vector2(0.3f, 0.9f)));
+		Transform2D t2_rs;
+		t2_rs.set_rotation_scale_and_skew(0.5f, Size2(2.0f, 4.0f), 0.25f);
+		out("t2.rs_skew0", t2_rs.columns[0]);
+		out("t2.rs_skew1", t2_rs.columns[1]);
 	}
 
 	// --- Rect2i

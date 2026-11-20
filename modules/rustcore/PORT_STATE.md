@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **243 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **250 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -144,6 +144,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/transform_3d.rs` | `core/math/transform_3d.*` | complete incl. batch `xform_array`/`xform_array_inv` (verified) |
 | `math/transform_interpolator.rs` | `core/math/transform_interpolator.*` | `find_method`/`_test_basis` (lerp vs slerp vs scaled slerp, shear and zero-scale fallbacks), basis and transform interpolation, 2D handedness flip, checksum. **Differential**: `ti.*` keys generated from `transform_interpolator.cpp` |
 | `math/transform_2d.rs` | `core/math/transform_2d.*` | complete |
+| `scene/node_2d.rs` | `scene/2d/node_2d.*` (data half) | position/rotation/scale/skew with the engine's lazy decomposition of `set_transform`, zero-scale clamp, `rotate`/`translate`, relative transform. `set_rotation_scale_and_skew` is differential (`t2.rs_skew*`). Parenting and notifications need the object layer |
 | `math/vector4.rs` | `core/math/vector4.*` | complete (`Vector4i` pending) |
 | `math/face3.rs` | `core/math/face3.*` | plane/area/aabb/split_by_plane, exact `get_closest_point_to`, SAT `intersects_aabb` (verified). ray/segment via `geometry_3d`, support + project_range (all verified) |
 | `math/vector4i.rs` | `core/math/vector4i.*` | core, `clamp`/`clampi`, `snapped`/`snappedi` (verified), `min`/`max_axis_index` |
@@ -169,6 +170,16 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
   `hashfuncs` was ported because hash values are observable.
 - `editor/` (332k lines), `platform/` (188k), `modules/mono` (74k),
   `thirdparty/` (2.87M). Not runtime, or not ours.
+
+## Marked pending, with the reason
+
+- `core/math/expression.cpp` (1529 lines). It is a tokenizer + parser +
+  evaluator whose every node is a `Variant`, and the engine's operator tables
+  (`Variant::evaluate`, conversion matrices, `in`/`not in`, indexing, built-in
+  functions with overloads) are exactly what this port has not built yet.
+  A numeric-only subset would answer a different API under the same name, so it
+  stays pending until `Variant` has the conversion/evaluation tables. `scene/`
+  started instead.
 
 ## Known open items
 

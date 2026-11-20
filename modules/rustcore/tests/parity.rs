@@ -698,6 +698,11 @@ fn transform2d_matches_cpp() {
         &v2(s.interpolate_with(&t, 0.35).xform(Vector2::new(0.3, 0.9))),
         F32_TOL,
     );
+
+    let mut t2_rs = Transform2D::IDENTITY;
+    t2_rs.set_rotation_scale_and_skew(0.5, Vector2::new(2.0, 4.0), 0.25);
+    check(&m, "t2.rs_skew0", &v2(t2_rs.columns[0]), F32_TOL);
+    check(&m, "t2.rs_skew1", &v2(t2_rs.columns[1]), F32_TOL);
 }
 
 // ---------------------------------------------------------------------------

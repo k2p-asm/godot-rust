@@ -188,6 +188,17 @@ impl Transform2D {
         self.set_scale(scale);
     }
 
+    /// `set_rotation_scale_and_skew`: the transform `Node2D` rebuilds whenever
+    /// one of its components changes.
+    #[inline]
+    pub fn set_rotation_scale_and_skew(&mut self, rot: f32, scale: Vector2, skew: f32) {
+        self.columns[0] = Vector2::new(rot.cos() * scale.x, rot.sin() * scale.x);
+        self.columns[1] = Vector2::new(
+            -(rot + skew).sin() * scale.y,
+            (rot + skew).cos() * scale.y,
+        );
+    }
+
     #[inline]
     pub fn get_scale(&self) -> Vector2 {
         let det_sign = funcs::sign_f32(self.determinant());

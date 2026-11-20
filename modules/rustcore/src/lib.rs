@@ -12,5 +12,6 @@ pub mod ffi;
 pub mod math;
 pub mod string;
 pub mod object;
+pub mod scene;
 pub mod variant;
 pub mod templates;
