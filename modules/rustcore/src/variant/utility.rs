@@ -651,6 +651,102 @@ pub fn max(a: &Variant, b: &Variant) -> UtilityResult {
     }
 }
 
+// -- scalar aliases ----------------------------------------------------------
+
+/// `absf`.
+pub fn absf(x: f64) -> f64 {
+    x.abs()
+}
+
+/// `absi`.
+pub fn absi(x: i64) -> i64 {
+    x.wrapping_abs()
+}
+
+/// `signf`: zero maps to zero (the engine's `SIGN`).
+pub fn signf(x: f64) -> f64 {
+    if x < 0.0 {
+        -1.0
+    } else if x > 0.0 {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+/// `signi`.
+pub fn signi(x: i64) -> i64 {
+    x.signum()
+}
+
+/// `floorf`.
+pub fn floorf(x: f64) -> f64 {
+    x.floor()
+}
+
+/// `floori`: the integer floor.
+pub fn floori(x: f64) -> i64 {
+    x.floor() as i64
+}
+
+/// `ceilf`.
+pub fn ceilf(x: f64) -> f64 {
+    x.ceil()
+}
+
+/// `ceili`.
+pub fn ceili(x: f64) -> i64 {
+    x.ceil() as i64
+}
+
+/// `roundf`.
+pub fn roundf(x: f64) -> f64 {
+    x.round()
+}
+
+/// `roundi`: rounds half away from zero, like `Math::round`.
+pub fn roundi(x: f64) -> i64 {
+    x.round() as i64
+}
+
+/// `snappedi`.
+pub fn snappedi(x: i64, step: i64) -> i64 {
+    if step == 0 {
+        return 0;
+    }
+    (x as f64 / step as f64).round() as i64 * step
+}
+
+/// `clampf`.
+pub fn clampf(value: f64, min: f64, max: f64) -> f64 {
+    value.clamp(min, max)
+}
+
+/// `clampi`.
+pub fn clampi(value: i64, min: i64, max: i64) -> i64 {
+    value.clamp(min, max)
+}
+
+/// `minf`.
+pub fn minf(a: f64, b: f64) -> f64 {
+    a.min(b)
+}
+
+/// `maxf`.
+pub fn maxf(a: f64, b: f64) -> f64 {
+    a.max(b)
+}
+
+/// `mini`.
+pub fn mini(a: i64, b: i64) -> i64 {
+    a.min(b)
+}
+
+/// `maxi`.
+pub fn maxi(a: i64, b: i64) -> i64 {
+    a.max(b)
+}
+
 // -- string conversions ------------------------------------------------------
 
 /// `str_to_var`: parses a variant expression (`[1, "two"]`, `{"k": 3}`, ...)
@@ -969,5 +1065,35 @@ mod tests {
             }
             other => panic!("expected an invalid-argument error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn scalar_aliases() {
+        assert_eq!(absf(-2.5), 2.5);
+        assert_eq!(absi(-7), 7);
+        assert_eq!(signf(-2.0), -1.0);
+        assert_eq!(signf(0.0), 0.0);
+        assert_eq!(signf(3.0), 1.0);
+        assert_eq!(signi(-3), -1);
+        assert_eq!(signi(0), 0);
+
+        assert_eq!(floorf(1.7), 1.0);
+        assert_eq!(floorf(-1.7), -2.0);
+        assert_eq!(floori(-1.7), -2);
+        assert_eq!(ceilf(1.2), 2.0);
+        assert_eq!(ceili(-1.2), -1);
+        assert_eq!(roundf(1.5), 2.0);
+        assert_eq!(roundi(-1.5), -2);
+        assert_eq!(snappedi(7, 5), 5);
+        assert_eq!(snappedi(-7, 5), -5);
+        assert_eq!(snappedi(7, 0), 0);
+
+        assert_eq!(clampf(5.0, 0.0, 3.0), 3.0);
+        assert_eq!(clampi(5, 0, 3), 3);
+        assert_eq!(clampi(-1, 0, 3), 0);
+        assert_eq!(minf(1.0, 2.0), 1.0);
+        assert_eq!(maxf(1.0, 2.0), 2.0);
+        assert_eq!(mini(1, 2), 1);
+        assert_eq!(maxi(1, 2), 2);
     }
 }
