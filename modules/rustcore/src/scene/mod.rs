@@ -73,6 +73,7 @@ pub mod line_2d;
 pub mod canvas_layer;
 pub mod margin_center;
 pub mod material;
+pub mod menu_bar;
 pub mod material_extras;
 pub mod mesh_instance_2d;
 pub mod mesh_instance_3d;
