@@ -42,6 +42,23 @@ cargo build --release
 modules\rustcore\parity\run.cmd  # regenerate the C++ fixture (needs MSVC)
 ```
 
+## Git
+
+The tree is a git repository whose first parent is the upstream
+`4.7.2-stable` tag (commit `ed1daf0`), branch `rust-port`. `git status` on a
+clean tree shows nothing, which proves the rest of the engine is byte-identical
+to upstream: only `modules/rustcore/` is ours.
+
+```powershell
+git status
+git add -A
+git commit -m "Rust port: <unit>"
+git push origin rust-port
+```
+
+`modules/rustcore/.gitignore` excludes `target/`, `parity/*.exe` and the
+`scons_check/` build products, so no binaries enter history.
+
 ## Verified state (last run)
 
 - `cargo test`: **210 unit tests + 33 differential tests, 0 failures.**
