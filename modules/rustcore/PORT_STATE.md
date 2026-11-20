@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **673 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **677 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -212,6 +212,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/panel_container.rs` | `scene/gui/panel_container.*` (layout) | Minimum `child + stylebox` and child cell `Rect2(offset, size - style_min)` with the child's flags via `Control::layout_in_cell`. Theme lookup not ported. **Non-differential** |
 | `scene/label_settings.rs` | `scene/resources/label_settings.*` | Line/paragraph spacing, font handle, size 16, colours, shadow defaults and the ordered stacked outline/shadow lists with the engine's add/move/remove/count/validation rules. Text layout not ported. **Non-differential** |
 | `scene/bone_map.rs` | `scene/resources/bone_map.*` | Profile revalidation (insert missing, drop unknown, null clears), mapping only existing profile bones, reverse lookup and count. **Non-differential** |
+| `scene/velocity_tracker_3d.rs` | `scene/3d/velocity_tracker_3d.*` | Four-frame position history, same-frame overwrite, physics/idle time conversion, 0.2 s averaging window and reset; ticks passed explicitly (no Engine singleton). **Non-differential** |
 | `scene/camera_3d.rs` | `scene/3d/camera_3d.*` (state) | Projection modes, FOV `1..=179`, size `> CMP_EPSILON`, near/far/frustum/h/v offsets, keep-aspect, cull mask `0xfffff` with layer bits `1..=20`, environment/attributes/compositor handles, Doppler mode and current flag. Projection matrix/RID not ported. **Non-differential** |
 | `scene/compositor.rs` | `scene/resources/compositor.*` | CompositorEffect defaults (enabled, post-transparent stage, four access flags) and the ordered effect list. Render callbacks/RIDs not ported. **Non-differential** |
 | `scene/shader.rs` | `scene/resources/shader.*` | Mode enum (6 modes + Max), code/include path, and indexed default textures where null at index 0 erases the parameter while other indices keep a null entry. Compilation/uniforms/RID not ported. **Non-differential** |
