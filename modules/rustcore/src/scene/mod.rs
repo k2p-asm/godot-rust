@@ -42,6 +42,7 @@ pub mod code_edit;
 pub mod code_highlighter;
 pub mod color_picker;
 pub mod color_picker_button;
+pub mod color_picker_shape;
 pub mod graph_frame;
 pub mod texture_rect;
 pub mod touch_button;
