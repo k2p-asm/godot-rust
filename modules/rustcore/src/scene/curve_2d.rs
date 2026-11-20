@@ -41,6 +41,7 @@ struct Interval {
     frac: f32,
 }
 
+#[derive(Debug)]
 pub struct Curve2D {
     points: Vec<Curve2DPoint>,
     bake_interval: f32,

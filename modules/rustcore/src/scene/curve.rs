@@ -39,6 +39,7 @@ impl CurvePoint {
     }
 }
 
+#[derive(Debug)]
 pub struct Curve {
     points: Vec<CurvePoint>,
     min_value: f32,
