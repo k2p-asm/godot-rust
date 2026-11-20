@@ -82,12 +82,25 @@ pub struct MaterialState {
     pub params: std::collections::HashMap<crate::string::string_name::StringName, crate::variant::Variant>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct MeshSurface {
+    pub material: Rid,
+    pub aabb: crate::math::aabb::Aabb,
+    pub primitive: i32,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct MeshState {
+    pub surfaces: Vec<MeshSurface>,
+}
+
 #[derive(Default)]
 pub struct RenderingServerData {
     canvas_items: RidOwner<CanvasItemState>,
     viewports: RidOwner<ViewportState>,
     textures: RidOwner<TextureState>,
     materials: RidOwner<MaterialState>,
+    meshes: RidOwner<MeshState>,
 }
 
 impl RenderingServerData {
@@ -295,6 +308,61 @@ impl RenderingServerData {
     pub fn material_count(&self) -> usize {
         self.materials.count()
     }
+
+    pub fn mesh_create(&mut self) -> Rid {
+        self.meshes.alloc(MeshState::default())
+    }
+
+    pub fn mesh_free(&mut self, mesh: Rid) -> bool {
+        self.meshes.free(mesh)
+    }
+
+    pub fn mesh_get(&self, mesh: Rid) -> Option<&MeshState> {
+        self.meshes.get(mesh)
+    }
+
+    /// mesh_add_surface; returns the new surface index.
+    pub fn mesh_add_surface(&mut self, mesh: Rid, surface: MeshSurface) -> Option<usize> {
+        let m = self.meshes.get_mut(mesh)?;
+        m.surfaces.push(surface);
+        Some(m.surfaces.len() - 1)
+    }
+
+    pub fn mesh_add_surface_material(&mut self, mesh: Rid, material: Rid) -> Option<usize> {
+        self.mesh_add_surface(
+            mesh,
+            MeshSurface {
+                material,
+                aabb: crate::math::aabb::Aabb::new(
+                    crate::math::vector3::Vector3::ZERO,
+                    crate::math::vector3::Vector3::ZERO,
+                ),
+                primitive: 0,
+            },
+        )
+    }
+
+    pub fn mesh_surface_count(&self, mesh: Rid) -> usize {
+        self.meshes.get(mesh).map(|m| m.surfaces.len()).unwrap_or(0)
+    }
+
+    /// mesh_surface_set_material; out-of-range indices return false.
+    pub fn mesh_surface_set_material(&mut self, mesh: Rid, surface: usize, material: Rid) -> bool {
+        match self.meshes.get_mut(mesh) {
+            Some(m) => match m.surfaces.get_mut(surface) {
+                Some(s) => {
+                    s.material = material;
+                    true
+                }
+                None => false,
+            },
+            None => false,
+        }
+    }
+
+    pub fn mesh_count(&self) -> usize {
+        self.meshes.count()
+    }
 }
 
 #[cfg(test)]
@@ -436,6 +504,51 @@ mod tests {
         assert!(rs.material_free(mat));
         assert_eq!(rs.material_get_param(mat, "roughness"), None);
         assert!(!rs.material_set_param(mat, "x", Variant::Int(1)));
+    }
+
+    #[test]
+    fn mesh_surfaces_and_materials() {
+        let mut rs = RenderingServerData::new();
+        let mesh = rs.mesh_create();
+        assert_eq!(rs.mesh_surface_count(mesh), 0);
+
+        let mat = rs.material_create();
+        assert_eq!(rs.mesh_add_surface_material(mesh, mat), Some(0));
+        let aabb = crate::math::aabb::Aabb::new(
+            crate::math::vector3::Vector3::new(-1.0, -1.0, -1.0),
+            crate::math::vector3::Vector3::new(2.0, 2.0, 2.0),
+        );
+        let s = rs.mesh_add_surface(
+            mesh,
+            MeshSurface {
+                material: Rid::INVALID,
+                aabb,
+                primitive: 3,
+            },
+        );
+        assert_eq!(s, Some(1));
+        assert_eq!(rs.mesh_surface_count(mesh), 2);
+
+        let m = rs.mesh_get(mesh).unwrap();
+        assert_eq!(m.surfaces[0].material, mat);
+        assert_eq!(m.surfaces[1].primitive, 3);
+        assert_eq!(m.surfaces[1].aabb, aabb);
+
+        // Reassign the second surface's material.
+        assert!(rs.mesh_surface_set_material(mesh, 1, mat));
+        assert_eq!(rs.mesh_get(mesh).unwrap().surfaces[1].material, mat);
+        assert!(!rs.mesh_surface_set_material(mesh, 9, mat));
+    }
+
+    #[test]
+    fn freed_meshes_reject_surfaces() {
+        let mut rs = RenderingServerData::new();
+        let mesh = rs.mesh_create();
+        assert!(rs.mesh_free(mesh));
+        assert_eq!(rs.mesh_add_surface_material(mesh, Rid::INVALID), None);
+        assert_eq!(rs.mesh_surface_count(mesh), 0);
+        assert!(!rs.mesh_surface_set_material(mesh, 0, Rid::INVALID));
+        assert_eq!(rs.mesh_count(), 0);
     }
 
     #[test]
