@@ -273,6 +273,8 @@ pub struct GeneratedArrays {
     /// Four floats per vertex (`xyz`, `w`).
     pub tangents: Vec<f32>,
     pub uvs: Vec<crate::math::vector2::Vector2>,
+    /// Filled by the box generator when dd_uv2 is set.
+    pub uv2s: Vec<crate::math::vector2::Vector2>,
     pub indices: Vec<i32>,
 }
 
@@ -349,6 +351,237 @@ pub fn generate_plane_arrays(
     }
 
     arrays
+}
+
+/// `BoxMesh::create_mesh_array`, including the optional UV2 layout.
+pub fn generate_box_arrays(
+    size: Vector3,
+    subdivide_w: i32,
+    subdivide_h: i32,
+    subdivide_d: i32,
+    add_uv2: bool,
+    uv2_padding: f32,
+) -> GeneratedArrays {
+    let onethird = 1.0f32 / 3.0;
+    let twothirds = 2.0f32 / 3.0;
+
+    let total_h = size.x + size.z + (2.0 * uv2_padding);
+    let padding_h = uv2_padding / total_h;
+    let width_h = size.x / total_h;
+    let depth_h = size.z / total_h;
+    let total_v = size.y + size.y + size.x.max(size.z) + (3.0 * uv2_padding);
+    let padding_v = uv2_padding / total_v;
+    let width_v = size.x / total_v;
+    let height_v = size.y / total_v;
+    let depth_v = size.z / total_v;
+
+    let start_pos = size * -0.5;
+    let mut arrays = GeneratedArrays::default();
+    let mut uv2s: Vec<crate::math::vector2::Vector2> = Vec::new();
+    let mut point = 0i32;
+
+    // front + back
+    let mut y = start_pos.y;
+    let mut thisrow = point;
+    let mut prevrow = 0i32;
+    for j in 0..=(subdivide_h + 1) {
+        let mut v = j as f32;
+        let v2 = v / (subdivide_h + 1) as f32;
+        v /= 2.0 * (subdivide_h + 1) as f32;
+
+        let mut x = start_pos.x;
+        for i in 0..=(subdivide_w + 1) {
+            let mut u = i as f32;
+            let u2 = u / (subdivide_w + 1) as f32;
+            u /= 3.0 * (subdivide_w + 1) as f32;
+
+            // front
+            arrays
+                .points
+                .push(Vector3::new(x, -y, -start_pos.z)); // double negative on Z
+            arrays.normals.push(Vector3::new(0.0, 0.0, 1.0));
+            arrays.tangents.extend_from_slice(&[1.0, 0.0, 0.0, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(u, v));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    u2 * width_h,
+                    v2 * height_v,
+                ));
+            }
+            point += 1;
+
+            // back
+            arrays
+                .points
+                .push(Vector3::new(-x, -y, start_pos.z));
+            arrays.normals.push(Vector3::new(0.0, 0.0, -1.0));
+            arrays.tangents.extend_from_slice(&[-1.0, 0.0, 0.0, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(twothirds + u, v));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    u2 * width_h,
+                    height_v + padding_v + (v2 * height_v),
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j > 0 {
+                let i2 = i * 2;
+                push_quad(&mut arrays.indices, prevrow + i2 - 2, prevrow + i2, thisrow + i2 - 2, prevrow + i2, thisrow + i2, thisrow + i2 - 2);
+                push_quad(&mut arrays.indices, prevrow + i2 - 1, prevrow + i2 + 1, thisrow + i2 - 1, prevrow + i2 + 1, thisrow + i2 + 1, thisrow + i2 - 1);
+            }
+
+            x += size.x / (subdivide_w + 1) as f32;
+        }
+
+        y += size.y / (subdivide_h + 1) as f32;
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    // left + right
+    y = start_pos.y;
+    thisrow = point;
+    prevrow = 0;
+    for j in 0..=(subdivide_h + 1) {
+        let mut v = j as f32;
+        let v2 = v / (subdivide_h + 1) as f32;
+        v /= 2.0 * (subdivide_h + 1) as f32;
+
+        let mut z = start_pos.z;
+        for i in 0..=(subdivide_d + 1) {
+            let mut u = i as f32;
+            let u2 = u / (subdivide_d + 1) as f32;
+            u /= 3.0 * (subdivide_d + 1) as f32;
+
+            // right
+            arrays
+                .points
+                .push(Vector3::new(-start_pos.x, -y, -z));
+            arrays.normals.push(Vector3::new(1.0, 0.0, 0.0));
+            arrays.tangents.extend_from_slice(&[0.0, 0.0, -1.0, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(onethird + u, v));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    width_h + padding_h + (u2 * depth_h),
+                    v2 * height_v,
+                ));
+            }
+            point += 1;
+
+            // left
+            arrays
+                .points
+                .push(Vector3::new(start_pos.x, -y, z));
+            arrays.normals.push(Vector3::new(-1.0, 0.0, 0.0));
+            arrays.tangents.extend_from_slice(&[0.0, 0.0, 1.0, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(u, 0.5 + v));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    width_h + padding_h + (u2 * depth_h),
+                    height_v + padding_v + (v2 * height_v),
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j > 0 {
+                let i2 = i * 2;
+                push_quad(&mut arrays.indices, prevrow + i2 - 2, prevrow + i2, thisrow + i2 - 2, prevrow + i2, thisrow + i2, thisrow + i2 - 2);
+                push_quad(&mut arrays.indices, prevrow + i2 - 1, prevrow + i2 + 1, thisrow + i2 - 1, prevrow + i2 + 1, thisrow + i2 + 1, thisrow + i2 - 1);
+            }
+
+            z += size.z / (subdivide_d + 1) as f32;
+        }
+
+        y += size.y / (subdivide_h + 1) as f32;
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    // top + bottom
+    let mut z = start_pos.z;
+    thisrow = point;
+    prevrow = 0;
+    for j in 0..=(subdivide_d + 1) {
+        let mut v = j as f32;
+        let v2 = v / (subdivide_d + 1) as f32;
+        v /= 2.0 * (subdivide_d + 1) as f32;
+
+        let mut x = start_pos.x;
+        for i in 0..=(subdivide_w + 1) {
+            let mut u = i as f32;
+            let u2 = u / (subdivide_w + 1) as f32;
+            u /= 3.0 * (subdivide_w + 1) as f32;
+
+            // top
+            arrays
+                .points
+                .push(Vector3::new(-x, -start_pos.y, -z));
+            arrays.normals.push(Vector3::new(0.0, 1.0, 0.0));
+            arrays.tangents.extend_from_slice(&[-1.0, 0.0, 0.0, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(onethird + u, 0.5 + v));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    u2 * width_h,
+                    ((height_v + padding_v) * 2.0) + (v2 * depth_v),
+                ));
+            }
+            point += 1;
+
+            // bottom
+            arrays
+                .points
+                .push(Vector3::new(x, start_pos.y, -z));
+            arrays.normals.push(Vector3::new(0.0, -1.0, 0.0));
+            arrays.tangents.extend_from_slice(&[1.0, 0.0, 0.0, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(twothirds + u, 0.5 + v));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    width_h + padding_h + (u2 * depth_h),
+                    ((height_v + padding_v) * 2.0) + (v2 * width_v),
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j > 0 {
+                let i2 = i * 2;
+                push_quad(&mut arrays.indices, prevrow + i2 - 2, prevrow + i2, thisrow + i2 - 2, prevrow + i2, thisrow + i2, thisrow + i2 - 2);
+                push_quad(&mut arrays.indices, prevrow + i2 - 1, prevrow + i2 + 1, thisrow + i2 - 1, prevrow + i2 + 1, thisrow + i2 + 1, thisrow + i2 - 1);
+            }
+
+            x += size.x / (subdivide_w + 1) as f32;
+        }
+
+        z += size.z / (subdivide_d + 1) as f32;
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    if add_uv2 {
+        arrays.uv2s = uv2s;
+    }
+    arrays
+}
+
+fn push_quad(indices: &mut Vec<i32>, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) {
+    indices.push(a);
+    indices.push(b);
+    indices.push(c);
+    indices.push(d);
+    indices.push(e);
+    indices.push(f);
 }
 
 #[derive(Clone, Debug)]
@@ -885,5 +1118,41 @@ mod tests {
         assert_eq!(p.get_orientation(), PlaneOrientation::FaceZ);
         assert_eq!(PlaneOrientation::FaceX as i32, 0);
         assert_eq!(PlaneOrientation::FaceZ as i32, 2);
+    }
+
+    #[test]
+    fn box_arrays_default_cube() {
+        let arrays = generate_box_arrays(Vector3::new(1.0, 1.0, 1.0), 0, 0, 0, false, 0.0);
+        // Six faces, each a 2x2 grid.
+        assert_eq!(arrays.points.len(), 24);
+        assert_eq!(arrays.normals.len(), 24);
+        assert_eq!(arrays.tangents.len(), 24 * 4);
+        assert_eq!(arrays.uvs.len(), 24);
+        assert_eq!(arrays.indices.len(), 36, "six quads");
+        assert!(arrays.uv2s.is_empty());
+        assert!(arrays.indices.iter().all(|&i| (0..24).contains(&i)));
+
+        // The first six vertices cover front and back on the first row.
+        assert_eq!(arrays.normals[0], Vector3::new(0.0, 0.0, 1.0));
+        assert_eq!(arrays.normals[1], Vector3::new(0.0, 0.0, -1.0));
+        assert_eq!(arrays.normals[2], Vector3::new(0.0, 0.0, 1.0));
+        assert_eq!(arrays.normals[3], Vector3::new(0.0, 0.0, -1.0));
+        // Corners sit at ±0.5 and the front half uses u in the first third.
+        assert_eq!(arrays.points[0], Vector3::new(-0.5, 0.5, 0.5));
+        assert!((arrays.uvs[0].x - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn box_arrays_subdivisions_and_uv2() {
+        let arrays = generate_box_arrays(Vector3::new(2.0, 2.0, 2.0), 1, 1, 1, true, 0.1);
+        // Each face is 3x3 = 9 vertices, six faces.
+        assert_eq!(arrays.points.len(), 54);
+        // Each face contributes (1+1)^2 = 4 quads = 24 indices.
+        assert_eq!(arrays.indices.len(), 144);
+        assert_eq!(arrays.uv2s.len(), 54, "UV2 is generated per vertex");
+        assert!(arrays.uv2s.iter().all(|uv| uv.x >= 0.0 && uv.y >= 0.0));
+        assert!(arrays.points.iter().all(|p| {
+            p.x.abs() <= 1.0 + 1e-6 && p.y.abs() <= 1.0 + 1e-6 && p.z.abs() <= 1.0 + 1e-6
+        }));
     }
 }
