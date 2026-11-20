@@ -386,6 +386,102 @@ impl GoString {
         text[..end].parse().unwrap_or(0.0)
     }
 
+    /// `find_char`: index of the first occurrence of `c`, -1 when absent.
+    pub fn find_char(&self, c: char) -> isize {
+        let needle = c as u32;
+        match self.data.iter().position(|&u| u == needle) {
+            Some(i) => i as isize,
+            None => -1,
+        }
+    }
+
+    /// `insert(pos, text)`, with `pos` clamped to the string bounds.
+    pub fn insert(&self, pos: usize, text: &Self) -> Self {
+        let pos = pos.min(self.len());
+        let mut data = Vec::with_capacity(self.len() + text.len());
+        data.extend_from_slice(&self.data[..pos]);
+        data.extend_from_slice(&text.data);
+        data.extend_from_slice(&self.data[pos..]);
+        Self { data: Arc::new(data) }
+    }
+
+    /// `repeat(count)`: empty for `count <= 0`.
+    pub fn repeat(&self, count: i32) -> Self {
+        if count <= 0 || self.is_empty() {
+            return Self::new();
+        }
+        let mut data = Vec::with_capacity(self.len() * count as usize);
+        for _ in 0..count {
+            data.extend_from_slice(&self.data);
+        }
+        Self { data: Arc::new(data) }
+    }
+
+    /// `pad_decimals`: truncate or zero-pad the fractional part to `digits`.
+    pub fn pad_decimals(&self, digits: i32) -> Self {
+        let s = self.clone();
+        let mut c = s.find_char('.');
+
+        if c == -1 {
+            if digits <= 0 {
+                return s;
+            }
+            let s = s.concatenated(&Self::from_str("."));
+            c = s.len() as isize - 1;
+            return pad_decimals_at(&s, c, digits);
+        }
+
+        if digits <= 0 {
+            return s.substr(0, c);
+        }
+        pad_decimals_at(&s, c, digits)
+    }
+
+    /// `pad_zeros`: zero-pad the integer part to `digits` digits, keeping the
+    /// sign and any fractional part in place.
+    pub fn pad_zeros(&self, digits: i32) -> Self {
+        let s = self.clone();
+        let mut end = s.find_char('.');
+        if end == -1 {
+            end = s.len() as isize;
+        }
+        if end == 0 {
+            return s;
+        }
+
+        let mut begin = 0isize;
+        while begin < end && !(0x30..=0x39).contains(&s.data[begin as usize]) {
+            begin += 1;
+        }
+
+        let zeros = digits - (end - begin) as i32;
+        if zeros <= 0 {
+            s
+        } else {
+            s.insert(begin as usize, &Self::from_str("0").repeat(zeros))
+        }
+    }
+
+    /// `lpad`: left-pad with `character` (repeated) up to `min_length`.
+    pub fn lpad(&self, min_length: i32, character: &Self) -> Self {
+        let padding = min_length - self.len() as i32;
+        if padding > 0 {
+            character.repeat(padding).concatenated(self)
+        } else {
+            self.clone()
+        }
+    }
+
+    /// `rpad`: right-pad with `character` (repeated) up to `min_length`.
+    pub fn rpad(&self, min_length: i32, character: &Self) -> Self {
+        let padding = min_length - self.len() as i32;
+        if padding > 0 {
+            self.concatenated(&character.repeat(padding))
+        } else {
+            self.clone()
+        }
+    }
+
     /// `String::hash()` -- MurmurHash3 over the UTF-32 units, little-endian.
     pub fn hash(&self) -> u32 {
         let mut bytes = Vec::with_capacity(self.data.len() * 4);
@@ -409,12 +505,51 @@ impl std::fmt::Display for GoString {
     }
 }
 
+/// The shared tail of `pad_decimals`, operating on a string that already has a
+/// decimal point at index `c`.
+fn pad_decimals_at(s: &GoString, c: isize, digits: i32) -> GoString {
+    let decimals = s.len() as i32 - (c as i32 + 1);
+    if decimals > digits {
+        s.substr(0, c + digits as isize + 1)
+    } else {
+        s.concatenated(&GoString::from_str("0").repeat(digits - decimals))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn s(v: &str) -> GoString {
         GoString::from_str(v)
+    }
+
+    #[test]
+    fn padding_helpers() {
+        assert_eq!(s("3.1").pad_decimals(3).as_string(), "3.100");
+        assert_eq!(s("3.14159").pad_decimals(2).as_string(), "3.14");
+        assert_eq!(s("3.14159").pad_decimals(0).as_string(), "3");
+        // No dot and no decimals requested: unchanged.
+        assert_eq!(s("7").pad_decimals(0).as_string(), "7");
+        // No dot but decimals requested: the dot is added first.
+        assert_eq!(s("7").pad_decimals(2).as_string(), "7.00");
+
+        assert_eq!(s("42").pad_zeros(5).as_string(), "00042");
+        // Sign and fractional part stay in place.
+        assert_eq!(s("-42").pad_zeros(5).as_string(), "-00042");
+        assert_eq!(s("3.5").pad_zeros(4).as_string(), "0003.5");
+        // Already long enough: unchanged.
+        assert_eq!(s("12345").pad_zeros(3).as_string(), "12345");
+
+        assert_eq!(s("ab").lpad(5, &s("0")).as_string(), "000ab");
+        assert_eq!(s("ab").rpad(5, &s("-")).as_string(), "ab---");
+        assert_eq!(s("abcdef").lpad(3, &s("0")).as_string(), "abcdef");
+        // The engine repeats the padding string `min_length - len` times, so a
+        // multi-character pad overshoots the requested length.
+        assert_eq!(s("x").rpad(5, &s("ab")).as_string(), "xabababab");
+        // Negative counts give an empty repeat, never a panic.
+        assert_eq!(s("").repeat(-3).as_string(), "");
+        assert_eq!(s("ab").repeat(0).as_string(), "");
     }
 
     #[test]
