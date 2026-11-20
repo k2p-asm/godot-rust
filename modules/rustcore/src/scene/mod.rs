@@ -154,6 +154,7 @@ pub mod scene_tree;
 pub mod shader;
 pub mod shapes_2d;
 pub mod shapes_3d;
+pub mod shapes_3d_extra;
 pub mod skeleton_3d;
 pub mod skeleton_profile;
 pub mod skeleton_2d;
