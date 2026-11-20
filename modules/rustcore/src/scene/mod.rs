@@ -10,6 +10,7 @@ pub mod aspect_ratio_container;
 pub mod animation_mixer;
 pub mod animation_player;
 pub mod bit_map;
+pub mod audio_stream_polyphonic;
 pub mod box_container;
 pub mod camera_attributes;
 pub mod canvas_item;
