@@ -9,6 +9,7 @@
 //! no `Variant`/`String`/`Object` ever appears here.
 
 pub mod ffi;
+pub mod crypto;
 pub mod input;
 pub mod io;
 pub mod math;
