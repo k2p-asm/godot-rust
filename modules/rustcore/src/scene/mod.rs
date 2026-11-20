@@ -79,6 +79,7 @@ pub mod gui_buttons;
 pub mod gui_indicators;
 pub mod gui_misc;
 pub mod gui_simple;
+pub mod gui_simple_extra;
 pub mod gui_containers_extra;
 pub mod gui_small_widgets;
 pub mod immediate_mesh;
