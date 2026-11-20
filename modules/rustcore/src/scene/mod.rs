@@ -31,6 +31,7 @@ pub mod canvas_layer;
 pub mod margin_center;
 pub mod mesh_instance_2d;
 pub mod node;
+pub mod placeholder_3d;
 pub mod polygon_2d;
 pub mod range;
 pub mod resource_extras;
