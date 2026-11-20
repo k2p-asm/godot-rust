@@ -11,6 +11,7 @@
 
 use crate::math::color::Color;
 use crate::math::transform_2d::Transform2D;
+use crate::math::vector2i::Vector2i;
 use crate::servers::rid::{Rid, RidOwner};
 
 #[derive(Clone, Copy, Debug)]
@@ -34,9 +35,29 @@ impl Default for CanvasItemState {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ViewportState {
+    pub canvas_transform: Transform2D,
+    pub size: Vector2i,
+    pub transparent_background: bool,
+    pub active: bool,
+}
+
+impl Default for ViewportState {
+    fn default() -> Self {
+        Self {
+            canvas_transform: Transform2D::IDENTITY,
+            size: Vector2i::ZERO,
+            transparent_background: false,
+            active: true,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct RenderingServerData {
     canvas_items: RidOwner<CanvasItemState>,
+    viewports: RidOwner<ViewportState>,
 }
 
 impl RenderingServerData {
@@ -111,6 +132,62 @@ impl RenderingServerData {
     pub fn canvas_item_count(&self) -> usize {
         self.canvas_items.count()
     }
+
+    pub fn viewport_create(&mut self) -> Rid {
+        self.viewports.alloc(ViewportState::default())
+    }
+
+    pub fn viewport_free(&mut self, viewport: Rid) -> bool {
+        self.viewports.free(viewport)
+    }
+
+    pub fn viewport_get(&self, viewport: Rid) -> Option<&ViewportState> {
+        self.viewports.get(viewport)
+    }
+
+    pub fn viewport_set_canvas_transform(&mut self, viewport: Rid, transform: Transform2D) -> bool {
+        match self.viewports.get_mut(viewport) {
+            Some(v) => {
+                v.canvas_transform = transform;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn viewport_set_size(&mut self, viewport: Rid, size: Vector2i) -> bool {
+        match self.viewports.get_mut(viewport) {
+            Some(v) => {
+                v.size = size;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn viewport_set_transparent_background(&mut self, viewport: Rid, enabled: bool) -> bool {
+        match self.viewports.get_mut(viewport) {
+            Some(v) => {
+                v.transparent_background = enabled;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn viewport_set_active(&mut self, viewport: Rid, active: bool) -> bool {
+        match self.viewports.get_mut(viewport) {
+            Some(v) => {
+                v.active = active;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn viewport_count(&self) -> usize {
+        self.viewports.count()
+    }
 }
 
 #[cfg(test)]
@@ -173,15 +250,52 @@ mod tests {
     }
 
     #[test]
-    fn handles_do_not_revive_after_reuse() {
+    fn viewport_defaults_and_setters() {
         let mut rs = RenderingServerData::new();
-        let a = rs.canvas_item_create();
-        assert!(rs.canvas_item_free(a));
-        let b = rs.canvas_item_create();
+        let vp = rs.viewport_create();
+        let v = rs.viewport_get(vp).unwrap();
+        assert_eq!(v.canvas_transform, Transform2D::IDENTITY);
+        assert_eq!(v.size, Vector2i::ZERO);
+        assert!(!v.transparent_background);
+        assert!(v.active);
 
-        assert!(rs.canvas_item_set_visible(b, false));
-        // The stale handle cannot write into the reused slot.
-        assert!(!rs.canvas_item_set_visible(a, true));
-        assert!(!rs.canvas_item_get(b).unwrap().visible);
+        let mut t = Transform2D::IDENTITY;
+        t.columns[2] = crate::math::vector2::Vector2::new(5.0, 6.0);
+        assert!(rs.viewport_set_canvas_transform(vp, t));
+        assert!(rs.viewport_set_size(vp, Vector2i::new(1280, 720)));
+        assert!(rs.viewport_set_transparent_background(vp, true));
+        assert!(rs.viewport_set_active(vp, false));
+
+        let v = rs.viewport_get(vp).unwrap();
+        assert_eq!(v.canvas_transform.columns[2], crate::math::vector2::Vector2::new(5.0, 6.0));
+        assert_eq!(v.size, Vector2i::new(1280, 720));
+        assert!(v.transparent_background);
+        assert!(!v.active);
+    }
+
+    #[test]
+    fn freed_viewports_reject_writes() {
+        let mut rs = RenderingServerData::new();
+        let vp = rs.viewport_create();
+        assert_eq!(rs.viewport_count(), 1);
+        assert!(rs.viewport_free(vp));
+
+        assert!(!rs.viewport_set_size(vp, Vector2i::ONE));
+        assert!(!rs.viewport_set_canvas_transform(vp, Transform2D::IDENTITY));
+        assert!(!rs.viewport_set_active(vp, true));
+        assert!(rs.viewport_get(vp).is_none());
+        assert_eq!(rs.viewport_count(), 0);
+        // The canvas-item owner is independent.
+        assert_eq!(rs.canvas_item_count(), 0);
+    }
+
+    #[test]
+    fn viewport_handles_do_not_revive_either() {
+        let mut rs = RenderingServerData::new();
+        let a = rs.viewport_create();
+        assert!(rs.viewport_free(a));
+        let b = rs.viewport_create();
+        assert!(!rs.viewport_set_active(a, false));
+        assert!(rs.viewport_get(b).unwrap().active);
     }
 }
