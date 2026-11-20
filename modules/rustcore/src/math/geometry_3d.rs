@@ -859,6 +859,262 @@ pub fn tetrahedralize_delaunay(points: &[Vector3]) -> Vec<i32> {
     crate::math::delaunay_3d::tetrahedralize_indices(&tets)
 }
 
+/// `Geometry3D::MeshData` as used by `build_convex_mesh`.
+#[derive(Clone, Debug, Default)]
+pub struct ConvexMeshFace {
+    pub indices: Vec<usize>,
+    pub plane: crate::math::plane::Plane,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ConvexMeshEdge {
+    pub vertex_a: usize,
+    pub vertex_b: usize,
+    pub face_a: usize,
+    pub face_b: i32,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ConvexMesh {
+    pub vertices: Vec<Vector3>,
+    pub faces: Vec<ConvexMeshFace>,
+    pub edges: Vec<ConvexMeshEdge>,
+}
+
+/// `Geometry3D::build_convex_mesh`: clips a large quad per plane against every
+/// other plane, dedupes the vertices (0.001 merge distance) and links edges.
+pub fn build_convex_mesh(
+    planes: &[crate::math::plane::Plane],
+) -> ConvexMesh {
+    const SUBPLANE_SIZE: f32 = 1024.0;
+    let mut mesh = ConvexMesh::default();
+
+    for (i, plane) in planes.iter().enumerate() {
+        let p = *plane;
+        let mut reference = Vector3::new(0.0, 1.0, 0.0);
+        if p.normal.dot(reference).abs() > 0.95 {
+            reference = Vector3::new(0.0, 0.0, 1.0);
+        }
+        let right = p.normal.cross(reference).normalized();
+        let up = p.normal.cross(right).normalized();
+        let center = p.normal * p.d;
+
+        let mut vertices: Vec<Vector3> = vec![
+            center - up * SUBPLANE_SIZE + right * SUBPLANE_SIZE,
+            center - up * SUBPLANE_SIZE - right * SUBPLANE_SIZE,
+            center + up * SUBPLANE_SIZE - right * SUBPLANE_SIZE,
+            center + up * SUBPLANE_SIZE + right * SUBPLANE_SIZE,
+        ];
+
+        for (j, clip) in planes.iter().enumerate() {
+            if j == i {
+                continue;
+            }
+            let clip = *clip;
+            if clip.normal.dot(p.normal) > 0.95 {
+                continue;
+            }
+            if vertices.len() < 3 {
+                break;
+            }
+            let mut new_vertices: Vec<Vector3> = Vec::new();
+            for k in 0..vertices.len() {
+                let k_n = (k + 1) % vertices.len();
+                let edge0 = vertices[k];
+                let edge1 = vertices[k_n];
+                let dist0 = clip.distance_to(edge0);
+                let dist1 = clip.distance_to(edge1);
+                if dist0 <= 0.0 {
+                    new_vertices.push(edge0);
+                }
+                if dist0 * dist1 < 0.0 {
+                    let rel = edge1 - edge0;
+                    let den = clip.normal.dot(rel);
+                    if crate::math::funcs::is_zero_approx(den) {
+                        continue;
+                    }
+                    let distance = -(clip.normal.dot(edge0) - clip.d) / den;
+                    new_vertices.push(edge0 + rel * distance);
+                }
+            }
+            vertices = new_vertices;
+        }
+
+        if vertices.len() < 3 {
+            continue;
+        }
+
+        let mut face = ConvexMeshFace {
+            indices: Vec::new(),
+            plane: p,
+        };
+        for vertex in &vertices {
+            let mut index = None;
+            for (k, existing) in mesh.vertices.iter().enumerate() {
+                if existing.distance_to(*vertex) < 0.001 {
+                    index = Some(k);
+                    break;
+                }
+            }
+            let index = match index {
+                Some(index) => index,
+                None => {
+                    mesh.vertices.push(*vertex);
+                    mesh.vertices.len() - 1
+                }
+            };
+            face.indices.push(index);
+        }
+        mesh.faces.push(face.clone());
+
+        for j in 0..face.indices.len() {
+            let a = face.indices[j];
+            let b = face.indices[(j + 1) % face.indices.len()];
+            let mut found = None;
+            for (k, edge) in mesh.edges.iter().enumerate() {
+                if (edge.vertex_a == a && edge.vertex_b == b)
+                    || (edge.vertex_b == a && edge.vertex_a == b)
+                {
+                    found = Some(k);
+                    break;
+                }
+            }
+            match found {
+                Some(k) => mesh.edges[k].face_b = j as i32,
+                None => mesh.edges.push(ConvexMeshEdge {
+                    vertex_a: a,
+                    vertex_b: b,
+                    face_a: j,
+                    face_b: -1,
+                }),
+            }
+        }
+    }
+
+    mesh
+}
+
+/// `edt`: the squared 1D distance transform along `stride`.
+fn edt(f: &mut [f32], stride: usize, n: usize) {
+    const BIG_VAL: f32 = 1e20;
+    let square = |x: i64| (x * x) as f32;
+
+    let mut d = vec![0.0f32; n];
+    let mut v = vec![0i32; n];
+    let mut z = vec![0.0f32; n + 1];
+
+    let mut k: i32 = 0;
+    v[0] = 0;
+    z[0] = -BIG_VAL;
+    z[1] = BIG_VAL;
+    for q in 1..n {
+        let q_i = q as i32;
+        let mut s = ((f[q * stride] + square(q_i as i64))
+            - (f[v[k as usize] as usize * stride] + square(v[k as usize] as i64)))
+            / (2 * q_i - 2 * v[k as usize]) as f32;
+        while s <= z[k as usize] {
+            k -= 1;
+            s = ((f[q * stride] + square(q_i as i64))
+                - (f[v[k as usize] as usize * stride] + square(v[k as usize] as i64)))
+                / (2 * q_i - 2 * v[k as usize]) as f32;
+        }
+        k += 1;
+        v[k as usize] = q_i;
+        z[k as usize] = s;
+        z[k as usize + 1] = BIG_VAL;
+    }
+
+    k = 0;
+    for q in 0..n {
+        while z[k as usize + 1] < q as f32 {
+            k += 1;
+        }
+        let diff = q as i64 - v[k as usize] as i64;
+        d[q] = square(diff) + f[v[k as usize] as usize * stride];
+    }
+
+    for i in 0..n {
+        f[i * stride] = d[i];
+    }
+}
+
+/// `Geometry3D::generate_edf`: the 3D Euclidean distance field, in voxels.
+/// Returns `None` when `voxels` does not match `size` (the engine's `ERR_FAIL`).
+pub fn generate_edf(
+    voxels: &[bool],
+    size: crate::math::vector3i::Vector3i,
+    negative: bool,
+) -> Option<Vec<u32>> {
+    const BIG_VAL: f32 = 1e20;
+    let float_count = (size.x * size.y * size.z) as usize;
+    if voxels.len() != float_count {
+        return None;
+    }
+
+    let mut work = vec![BIG_VAL; float_count];
+    let y_mult = size.x as usize;
+    let z_mult = y_mult * size.y as usize;
+
+    for (i, value) in voxels.iter().enumerate() {
+        let plot = if negative { !*value } else { *value };
+        if plot {
+            work[i] = 0.0;
+        }
+    }
+
+    // xy -> z
+    for i in 0..size.x as usize {
+        for j in 0..size.y as usize {
+            let offset = i + j * y_mult;
+            let mut column: Vec<f32> = (0..size.z as usize).map(|k| work[offset + k * z_mult]).collect();
+            edt(&mut column, 1, size.z as usize);
+            for (k, value) in column.into_iter().enumerate() {
+                work[offset + k * z_mult] = value;
+            }
+        }
+    }
+
+    // xz -> y
+    for i in 0..size.x as usize {
+        for j in 0..size.z as usize {
+            let offset = i + j * z_mult;
+            let mut column: Vec<f32> = (0..size.y as usize).map(|k| work[offset + k * y_mult]).collect();
+            edt(&mut column, 1, size.y as usize);
+            for (k, value) in column.into_iter().enumerate() {
+                work[offset + k * y_mult] = value;
+            }
+        }
+    }
+
+    // yz -> x
+    for i in 0..size.y as usize {
+        for j in 0..size.z as usize {
+            let offset = i * y_mult + j * z_mult;
+            let mut row: Vec<f32> = (0..size.x as usize).map(|k| work[offset + k]).collect();
+            edt(&mut row, 1, size.x as usize);
+            for (k, value) in row.into_iter().enumerate() {
+                work[offset + k] = value;
+            }
+        }
+    }
+
+    Some(work.iter().map(|value| value.sqrt() as u32).collect())
+}
+
+/// `Geometry3D::generate_sdf8`: the signed distance, clamped to `i8`.
+pub fn generate_sdf8(positive: &[u32], negative: &[u32]) -> Option<Vec<i8>> {
+    if positive.len() != negative.len() {
+        return None;
+    }
+    Some(
+        positive
+            .iter()
+            .zip(negative)
+            .map(|(p, n)| (*p as i32 - *n as i32).clamp(-128, 127) as i8)
+            .collect(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -928,5 +1184,56 @@ mod tests {
             v2
         )
         .is_none());
+    }
+
+    #[test]
+    fn convex_mesh_from_box_planes() {
+        let planes = build_box_planes(Vector3::new(1.0, 2.0, 3.0));
+        let mesh = build_convex_mesh(&planes);
+        assert_eq!(mesh.faces.len(), 6, "one quad per box face");
+        assert_eq!(mesh.vertices.len(), 8, "the box corners");
+        // Every plane's face is convex with at least three vertices.
+        assert!(mesh.faces.iter().all(|face| face.indices.len() >= 3));
+        // Every edge is shared by two faces after the second pass.
+        assert!(mesh.edges.iter().all(|edge| edge.face_b >= 0));
+        // Each vertex lies on the box's surface, never outside it.
+        assert!(mesh.vertices.iter().all(|v| {
+            v.x.abs() <= 1.001 && v.y.abs() <= 2.001 && v.z.abs() <= 3.001
+        }));
+    }
+
+    #[test]
+    fn edf_of_a_single_voxel() {
+        let size = crate::math::vector3i::Vector3i::new(3, 3, 3);
+        let mut voxels = vec![false; 27];
+        voxels[0] = true;
+        let field = generate_edf(&voxels, size, false).expect("matching size");
+        assert_eq!(field.len(), 27);
+        // Distances are rounded down from the true Euclidean distance.
+        assert_eq!(field[0], 0);
+        assert_eq!(field[1], 1);
+        assert_eq!(field[3], 1); // y step
+        assert_eq!(field[9], 1); // z step
+        // (2,0,0) -> 2, (1,1,1) -> sqrt(3) = 1.73 -> 1
+        assert_eq!(field[2], 2);
+        assert_eq!(field[13], 1);
+        assert_eq!(field[26], 3, "sqrt(12) = 3.46 truncates to 3");
+
+        // The negative flag inverts solid/empty.
+        let inverted = generate_edf(&voxels, size, true).expect("matching size");
+        assert_eq!(inverted[0], 1, "the only cell not filled is now one step away");
+
+        // Size mismatches are refused.
+        assert!(generate_edf(&[true], size, false).is_none());
+    }
+
+    #[test]
+    fn sdf8_clamps() {
+        assert_eq!(
+            generate_sdf8(&[10, 200, 3], &[5, 0, 10]).unwrap(),
+            vec![5, 127, -7]
+        );
+        assert_eq!(generate_sdf8(&[0, 0], &[200, 0]).unwrap(), vec![-128, 0]);
+        assert!(generate_sdf8(&[1], &[1, 2]).is_none());
     }
 }
