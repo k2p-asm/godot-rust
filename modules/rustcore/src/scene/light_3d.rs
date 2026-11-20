@@ -400,9 +400,82 @@ impl SpotLight3DData {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct AreaLight3DData {
+    pub light: Light3DData,
+    area_size: crate::math::vector2::Vector2,
+    area_texture: Option<crate::servers::rid::Rid>,
+    area_normalize_energy: bool,
+}
+
+impl Default for AreaLight3DData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AreaLight3DData {
+    pub fn new() -> Self {
+        let mut light = Light3DData::new(LightType::Area);
+        // The constructor overrides these three params for area lights.
+        light.set_param(Param::ShadowBias, 0.1);
+        light.set_param(Param::Size, 0.5);
+        light.set_param(Param::Specular, 1.0);
+        Self {
+            light,
+            area_size: crate::math::vector2::Vector2::new(1.0, 1.0),
+            area_texture: None,
+            area_normalize_energy: true,
+        }
+    }
+
+    pub fn set_area_size(&mut self, size: crate::math::vector2::Vector2) {
+        self.area_size = size;
+    }
+
+    pub fn get_area_size(&self) -> crate::math::vector2::Vector2 {
+        self.area_size
+    }
+
+    pub fn set_area_texture(&mut self, texture: Option<crate::servers::rid::Rid>) {
+        self.area_texture = texture;
+    }
+
+    pub fn get_area_texture(&self) -> Option<crate::servers::rid::Rid> {
+        self.area_texture
+    }
+
+    pub fn set_area_normalize_energy(&mut self, enabled: bool) {
+        self.area_normalize_energy = enabled;
+    }
+
+    pub fn is_area_normalizing_energy(&self) -> bool {
+        self.area_normalize_energy
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn area_light_defaults() {
+        let mut area = AreaLight3DData::new();
+        assert_eq!(area.light.get_light_type(), LightType::Area);
+        assert_eq!(area.get_area_size(), crate::math::vector2::Vector2::new(1.0, 1.0));
+        assert!(area.get_area_texture().is_none());
+        assert!(area.is_area_normalizing_energy());
+        assert_eq!(area.light.get_param(Param::ShadowBias), Some(0.1));
+        assert_eq!(area.light.get_param(Param::Size), Some(0.5));
+        assert_eq!(area.light.get_param(Param::Specular), Some(1.0));
+
+        area.set_area_size(crate::math::vector2::Vector2::new(2.0, 3.0));
+        area.set_area_texture(Some(crate::servers::rid::Rid::from_u64(4)));
+        area.set_area_normalize_energy(false);
+        assert_eq!(area.get_area_size(), crate::math::vector2::Vector2::new(2.0, 3.0));
+        assert_eq!(area.get_area_texture(), Some(crate::servers::rid::Rid::from_u64(4)));
+        assert!(!area.is_area_normalizing_energy());
+    }
 
     #[test]
     fn base_defaults() {
