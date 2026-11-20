@@ -17,6 +17,7 @@ pub mod gradient;
 pub mod grid_container;
 pub mod line_2d;
 pub mod canvas_layer;
+pub mod margin_center;
 pub mod node;
 pub mod polygon_2d;
 pub mod scene_tree;
