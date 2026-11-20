@@ -135,6 +135,7 @@ pub mod navigation_agent_3d;
 pub mod navigation_mesh;
 pub mod navigation_nodes_3d;
 pub mod navigation_polygon;
+pub mod navigation_source_geometry;
 pub mod node;
 pub mod placeholder_3d;
 pub mod polygon_2d;
