@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1469 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1474 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -197,6 +197,7 @@ um_int64`/
 um_uint64`) | bases 2-36, INT64_MIN, u64::MAX; plus 
 um_float` (fixed decimals, zero trimming, `-0.0`, inf/nan, 16-decimal cap, half-to-even rounding). **Non-differential** (see note 3) |
 | `math/fieldwise.rs` | `core/math/math_fieldwise.cpp` | `fieldwise_assign` over 14 variant types (Vector2..Transform3D), type-mismatch and unknown-field no-ops. **Non-differential** (engine code is `#ifdef DEBUG_ENABLED`) |
+| `scene/style_box_flat.rs` | `scene/resources/style_box_flat.*` (state) | The flat style box: background/shadow/border colours, four border widths with the minimum accessor, expand margins, corner radii (all/individual/per corner), corner detail, centre drawing, border blending, skew, shadow size/offset, anti-aliasing and its size, the border style margins and `get_draw_rect` (expand margins merged with the offset shadow). Drawing not ported. **Non-differential** |
 | `scene/spring_bone_collision.rs` | `scene/3d/spring_bone_collision*.*` (state) | The base collider (bone name/index, position/rotation offsets), the sphere (radius 0.1, inside), the capsule (radius 0.1, height 0.5, inside, the `mid_height = height - 2*radius` mapping and the negative guard) and the plane marker. Pose sync/collision solve not ported. **Non-differential** |
 | `scene/style_box_extra.rs` | `scene/resources/style_box_line.*`, `scene/resources/style_box_texture.*` (state) | StyleBoxLine (colour, thickness, vertical, grow begin/end, the engine's half-thickness side margins) and StyleBoxTexture (texture, texture/expand margins, region, centre drawing, modulate, per-axis stretch modes, style margins and `get_draw_rect`). Drawing not ported. **Non-differential** |
 | `scene/misc_small_resources.rs` | `scene/main/missing_node.*`, `scene/3d/lightmap_probe.*`, `scene/resources/text_file.*`, `external_texture.*`, `camera_texture.*`, `texture_rd.*` (state) | MissingNode (original class/scene, recording flags, property map last-write-wins), the LightmapProbe marker, TextFile (text/path; `load_text` records the path and reports false pending the resource-path layer), ExternalTexture (256×256 default, buffer id, placeholder, RID), CameraTexture (feed id/image, RID) and Texture2DRD (RD RID, size). **Non-differential** |

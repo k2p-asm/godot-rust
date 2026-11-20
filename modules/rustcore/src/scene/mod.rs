@@ -168,6 +168,7 @@ pub mod sprite_2d;
 pub mod sprite_frames;
 pub mod style_box;
 pub mod style_box_extra;
+pub mod style_box_flat;
 pub mod subviewport_container;
 pub mod surface_tool;
 pub mod texture_button;
