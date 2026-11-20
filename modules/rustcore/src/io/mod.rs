@@ -5,6 +5,7 @@ pub mod json;
 pub mod logger;
 pub mod json_native;
 pub mod path_utils;
+pub mod plist;
 pub mod resource_uid;
 pub mod variant_parser;
 pub mod xml_parser;
