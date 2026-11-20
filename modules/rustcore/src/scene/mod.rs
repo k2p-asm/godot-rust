@@ -65,4 +65,5 @@ pub mod theme;
 pub mod tile_map_layer;
 pub mod tile_set;
 pub mod timer;
+pub mod velocity_tracker_3d;
 pub mod visible_on_screen_notifier_2d;
