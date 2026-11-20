@@ -32,6 +32,7 @@ struct Point {
     color: Color,
 }
 
+#[derive(Clone, Debug)]
 pub struct Gradient {
     points: Vec<Point>,
     is_sorted: bool,

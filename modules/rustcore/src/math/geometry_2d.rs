@@ -104,6 +104,24 @@ pub fn is_segment_intersecting_polygon(from: Vector2, to: Vector2, polygon: &[Ve
 
 /// `vec2_cross(O, A, B)`: the z of `(A-O) x (B-O)`.
 #[inline]
+/// `Geometry2D::get_closest_point_to_segment_uncapped`: projection onto the
+/// infinite line through `a` and `b` (no clamping to the segment). A degenerate
+/// segment returns `a`.
+pub fn get_closest_point_to_segment_uncapped(
+    point: Vector2,
+    a: Vector2,
+    b: Vector2,
+) -> Vector2 {
+    let c = point - a;
+    let n = b - a;
+    let d = n.length_squared();
+    if d < 1e-12 {
+        return a;
+    }
+    let t = n.dot(c) / d;
+    a + n * t
+}
+
 pub fn vec2_cross(o: Vector2, a: Vector2, b: Vector2) -> f32 {
     (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
 }
