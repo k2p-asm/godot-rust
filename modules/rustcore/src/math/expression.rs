@@ -53,6 +53,8 @@ enum UnOp {
 enum Node {
     Const(Variant),
     Var(String),
+    SelfRef,
+    Member(Box<Node>, String),
     Array(Vec<Node>),
     Dict(Vec<(Node, Node)>),
     Unary(UnOp, Box<Node>),
@@ -112,7 +114,11 @@ impl<'a> Lexer<'a> {
         self.pos += 1;
 
         match c {
-            '0'..='9' | '.' => {
+            '0'..='9' => {
+                self.pos -= 1;
+                self.read_number()
+            }
+            '.' if matches!(self.peek(), Some('0'..='9')) => {
                 self.pos -= 1;
                 self.read_number()
             }
@@ -247,6 +253,7 @@ impl<'a> Lexer<'a> {
                 '}' => "}",
                 ',' => ",",
                 ':' => ":",
+                '.' => ".",
                 _ => return Err(format!("Unexpected character '{c}'")),
             },
         };
@@ -387,6 +394,15 @@ impl Parser {
                 let index = self.parse_expression(0)?;
                 self.expect_op("]")?;
                 node = Node::Index(Box::new(node), Box::new(index));
+            } else if self.eat_op(".") {
+                let name = match self.peek().clone() {
+                    Token::Ident(n) => {
+                        self.pos += 1;
+                        n
+                    }
+                    _ => return Err("Expected a member name after '.'".into()),
+                };
+                node = Node::Member(Box::new(node), name);
             } else if self.eat_op("(") {
                 let name = match &node {
                     Node::Var(n) => n.clone(),
@@ -430,6 +446,7 @@ impl Parser {
                     "true" => Ok(Node::Const(Variant::Bool(true))),
                     "false" => Ok(Node::Const(Variant::Bool(false))),
                     "null" | "nil" => Ok(Node::Const(Variant::Nil)),
+                    "self" => Ok(Node::SelfRef),
                     "PI" => Ok(Node::Const(Variant::Float(std::f64::consts::PI))),
                     "TAU" => Ok(Node::Const(Variant::Float(std::f64::consts::TAU))),
                     "INF" => Ok(Node::Const(Variant::Float(f64::INFINITY))),
@@ -521,6 +538,18 @@ fn eval(node: &Node, inputs: &HashMap<String, Variant>) -> Result<Variant, Strin
             .get(name)
             .cloned()
             .ok_or_else(|| format!("Unknown input '{name}'")),
+        Node::SelfRef => inputs
+            .get("self")
+            .cloned()
+            .ok_or_else(|| "'self' is not set".to_string()),
+        Node::Member(base, name) => {
+            let v = eval(base, inputs)?;
+            match v {
+                Variant::Object(id) => crate::object::class_db::property_get(id, name)
+                    .ok_or_else(|| format!("Object has no property '{name}'")),
+                _ => Err("Member access needs an object".into()),
+            }
+        }
         Node::Array(items) => {
             let mut out = Vec::with_capacity(items.len());
             for i in items {
@@ -949,6 +978,36 @@ mod tests {
         assert_eq!(run("\"k\" in { \"k\": 1 }").unwrap(), Variant::Bool(true));
         assert_eq!(run("5 not in [1, 2]").unwrap(), Variant::Bool(true));
         assert_eq!(run("2 not in [1, 2]").unwrap(), Variant::Bool(false));
+    }
+
+    #[test]
+    fn self_member_access_reads_classdb_properties() {
+        use crate::object::{class_db, Object};
+
+        class_db::register_class("ExprObj", None);
+        class_db::register_property("ExprObj", "speed");
+        let obj = Object::new();
+        class_db::bind_instance(obj.id(), "ExprObj");
+        assert!(class_db::property_set(obj.id(), "speed", Variant::Float(2.5)));
+
+        let e = Expression::parse("self.speed * 2").unwrap();
+        let mut map = HashMap::new();
+        map.insert("self".to_string(), Variant::Object(obj.id()));
+        assert_eq!(e.execute(&map).unwrap(), Variant::Float(5.0));
+
+        // A missing property is an error, not nil.
+        let bad = Expression::parse("self.missing").unwrap();
+        assert!(bad.execute(&map).is_err());
+
+        // Member access on a non-object is an error too.
+        let bad2 = Expression::parse("x.member").unwrap();
+        let mut m2 = HashMap::new();
+        m2.insert("x".to_string(), Variant::Int(1));
+        assert!(bad2.execute(&m2).is_err());
+
+        // `self` without a bound object errors.
+        let e3 = Expression::parse("self.speed").unwrap();
+        assert!(e3.execute(&HashMap::new()).is_err());
     }
 
     #[test]
