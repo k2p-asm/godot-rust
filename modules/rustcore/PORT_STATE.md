@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **612 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **617 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -193,6 +193,25 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/geometry_2d.rs` | `core/math/geometry_2d.h` | hit tests + `vec2_cross`, `convex_hull` (verified: 5 points, first repeated), `bresenham_line` (verified) |
 | `ffi.rs` | (new) | `gcr_variant_nil/bool/int/float/vector3`, `gcr_variant_type/as_int/as_float/as_vector3/booleanize`; verified inside the engine build (prints `variant tag = 2, truthy = 1` and `Rust packed sum = 256`) | **old**: C ABI: `gcr_abi_version`, `gcr_vector3_dot`, `gcr_vector3_normalized`, `gcr_transform3d_xform` |
 | `templates/hashfuncs.rs` | `core/templates/hashfuncs.*` | complete |
+| `scene/node_3d.rs` | `scene/3d/node_3d.*` (data half) | Local transform, Euler rotation and scale as separate authoritative states with lazy derivation; six Euler orders and the engine's order-change rules; `RotationEditMode` with orthogonalize when leaving Basis mode; position/basis/quaternion accessors, rotate helpers, `orthonormalize`, `set_identity`, `look_at(_from_position)` preserving scale, and global compose/inverse with a supplied parent plus `top_level`. **Non-differential** |
+| `scene/light_2d.rs` | `scene/2d/light_2d.*` (state) | Light2D/PointLight2D header defaults, shadow-filter/blend enums, `SHADOW_FILTER_MAX` rejection, zero texture scale -> `CMP_EPSILON`. Rendering not ported. **Non-differential** |
+| `scene/shapes_2d.rs` | `scene/resources/2d/*_shape_2d.*` | Rectangle, Circle, Capsule, Segment, WorldBoundary, SeparationRay, ConvexPolygon (hull via `Geometry2D::convex_hull`, `>= 3` points, repeated first point kept) and ConcavePolygon: defaults, dimension validation and `get_rect`/`get_enclosing_radius` copied from the C++. **Non-differential** |
+| `scene/node2d_extras.rs` | `scene/2d/{remote_transform_2d,canvas_modulate,back_buffer_copy,marker_2d,canvas_group}.*` | RemoteTransform2D flags/path, CanvasModulate colour, BackBufferCopy rect/mode, Marker2D extents, CanvasGroup margins with negative rejection. **Non-differential** |
+| `scene/gui_misc.rs` | `scene/gui/{texture_rect,nine_patch_rect,color_rect,separator}.*` | TextureRect expand/stretch enums and flips, NinePatchRect margins/region/axis modes, ColorRect colour, Separator orientation. **Non-differential** |
+| `scene/style_box.rs` | `scene/resources/style_box.*`, `style_box_flat.*` | Content margins with the `-1` fallback to the subclass style margin, minimum size/offset, and the flat box's colours, borders, expand margins, corner radii, draw center, blend, skew, anti-aliasing and shadow, with `corner_detail` 1..=20 and `aa_size` 0.01..=10 clamps. **Non-differential** |
+| `scene/animation_library.rs` | `scene/resources/animation_library.*` | Name validation, `validate_library_name`, add-or-replace, remove, rename with all three rejections, lookup and the alphabetically sorted list (`RBMap` order). **Non-differential** |
+| `scene/gradient_texture.rs` | `scene/resources/gradient_texture.*` | 1D/2D dimension validation `1..=16384`, and `_get_gradient_offset_at` reproduced per texel: signed linear projection, radial, Chebyshev square, positive conic, then none/repeat/mirror. **Non-differential** |
+| `scene/texture_misc.rs` | `scene/resources/curve_texture.*`, `placeholder_textures.*` | CurveTexture/CurveXYZTexture width `32..=4096`, RGB/RED mode and `ensure_default_setup` flat curve; PlaceholderTexture2D unvalidated size. **Non-differential** |
+| `scene/path_2d.rs` | `scene/2d/path_2d.*` (Path2D), `audio_listener_2d.*` | Path2D curve accessors; AudioListener2D current flag. `PathFollow2D` pending (needs Curve2D forward-vector cache). **Non-differential** |
+| `scene/theme.rs` | `scene/resources/theme.*` (colours/constants/font sizes + variations) | Identifier validation and `validate_type_name`, per-type nested maps with add/rename/clear and their exact failures, sorted lists, positive-size font rules with default and fallback 16, and recursive type variations. Icons/styleboxes/fonts not ported. **Non-differential** |
+| `scene/range.rs` | `scene/gui/range.*` (value state) | `_calc_value` with min-offset snapping, rounding, `max - page`/`min` clamps and greater/lesser allowances; min/max/page revalidation; linear and exponential `as_ratio`. Signals/sharing not ported. **Non-differential** |
+| `scene/gui_indicators.rs` | `scene/gui/{scroll_bar,slider,progress_bar}.*` (state) | ScrollBar step 0/custom step/smooth scroll; Slider ticks, position, editable and scrollable; ProgressBar step 0.01, percentage/indeterminate flags and fill modes with `FILL_MODE_MAX` rejection. **Non-differential** |
+| `scene/bit_map.rs` | `scene/resources/bit_map.*` (grid half) | Packed bits with create limits, checked set/get, clipped rect fill, popcount, nearest-neighbour resize, circular grow/shrink masks with rect clipping, and blit. Image import/export and marching squares not ported. **Non-differential** |
+| `scene/light_occluder_2d.rs` | `scene/2d/light_occluder_2d.*` | OccluderPolygon2D vertices/closed/cull mode and LightOccluder2D polygon reference, light mask and SDF flag. RIDs/SDF generation not ported. **Non-differential** |
+| `io/json.rs` | `core/io/json.*` (parse/stringify) | Engine token rules (floats for all numbers), full string escapes incl. surrogate pairs, exact error messages/lines, 1024 depth cap; stringify with sorted keys, optional indent, 14-magnitude fixed precision, `0.0`/inf/NaN handling and JSON escaping. Native conversions not ported. **Non-differential** |
+| `scene/panel_container.rs` | `scene/gui/panel_container.*` (layout) | Minimum `child + stylebox` and child cell `Rect2(offset, size - style_min)` with the child's flags via `Control::layout_in_cell`. Theme lookup not ported. **Non-differential** |
+| `scene/parallax_2d.rs` | `scene/2d/parallax_2d.*` (state) | Scroll scale/offset, screen offset, repeat size (`maxf(0)`) and times (`>= 1`), ±10,000,000 limits, autoscroll, follow/ignore flags, group name. Camera-moved math not ported. **Non-differential** |
+| `scene/visible_on_screen_notifier_2d.rs` | `scene/2d/visible_on_screen_notifier_2d.*` (state) | Notifier rect/show-rect/on-screen hook and enabler enable modes with default `..` path. Server registration/signals not ported. **Non-differential** |
 | `servers/audio_effect_{reverb,delay,chorus,distortion,eq,filter,misc}.rs` | `servers/audio/effects/audio_effect_*.{h,cpp}` | Parameter state for every effect class: Reverb, Delay, Chorus, Distortion, EQ6/10/21, the five filters, Limiter, Amplify, Panner, StereoEnhance, Compressor and PitchShift. Defaults copied from each constructor or in-class initialiser; setters replicate the C++ validation (EQ band index, chorus voice index/count, pitch scale `> 0`, oversampling `>= 4`, FFT size `< MAX`, reverb feedback `0..0.98`) and never clamp where the engine does not. `Amplify` converts through `linear_to_db`/`db_to_linear`. DSP/`process()` is not ported. **Non-differential** (`AudioEffect` is `Resource`-backed) |
 | `servers/audio_bus.rs` | `servers/audio/audio_bus_layout.*` (state) | Master bus that cannot be removed, add/remove with send reindexing, volume/mute/solo/bypass, validated send targets, and `is_bus_active` with the engine's solo rule. Mixing not ported. **Non-differential** |
 
@@ -209,10 +228,10 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 - `core/math/expression.cpp` is **partially ported** (`math/expression.rs`):
   tokenizer, precedence-climbing parser, array/dictionary literals, variables,
   indexing, unary `- ! ~`, `+ - * / % **`, comparisons, `and/or` with
-  short-circuit, bitwise/shifts, and a math builtin subset. Still missing:
-  `self`/member access, assignment, `in`/`not in`, and the engine's full
-  ~100-function builtin table. The engine's shunting-yard emits the same
-  precedences, but its node set is larger.
+  short-circuit, bitwise/shifts, `in`/`not in`, arrays/dictionaries, `self`,
+  member reads and object method calls, and a math builtin subset. Still
+  missing: the engine's full ~100-function builtin table and assignment (which
+  the engine's `Expression` does not implement either).
 
 ## Known open items
 
