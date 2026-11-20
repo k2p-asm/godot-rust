@@ -7,6 +7,7 @@ pub mod gstring;
 pub mod num;
 pub mod slices;
 pub mod plural_rules;
+pub mod string_builder;
 pub mod string_name;
 pub mod translation;
 pub mod char_utils;
