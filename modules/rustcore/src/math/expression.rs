@@ -38,6 +38,8 @@ enum BinOp {
     BitXor,
     Shl,
     Shr,
+    In,
+    NotIn,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -270,7 +272,7 @@ fn precedence(op: BinOp) -> (u8, bool) {
     match op {
         BinOp::Or => (1, false),
         BinOp::And => (2, false),
-        BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => (3, false),
+        BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge | BinOp::In | BinOp::NotIn => (3, false),
         BinOp::BitOr => (4, false),
         BinOp::BitXor => (5, false),
         BinOp::BitAnd => (6, false),
@@ -334,6 +336,12 @@ impl Parser {
                 // `and` / `or` are keywords, not operator tokens.
                 Token::Ident(id) if id == "and" => (BinOp::And, 1),
                 Token::Ident(id) if id == "or" => (BinOp::Or, 1),
+                Token::Ident(id) if id == "in" => (BinOp::In, 1),
+                Token::Ident(id) if id == "not"
+                    && matches!(self.tokens.get(self.pos + 1), Some(Token::Ident(n)) if n == "in") =>
+                {
+                    (BinOp::NotIn, 2)
+                }
                 _ => break,
             };
             let (bp, right) = precedence(op);
@@ -596,6 +604,17 @@ fn eval_binary(
     }
 
     match op {
+        BinOp::In | BinOp::NotIn => {
+            let contained = match (&a, &b) {
+                (Variant::String(needle), Variant::String(hay)) => hay.find(needle, 0) != -1,
+                (v, Variant::Array(items)) => items.iter().any(|x| equals(x, v) == Some(true)),
+                (k, Variant::Dictionary(map)) => map.contains_key(
+                    &crate::string::string_name::StringName::new(&stringify(k).as_string()),
+                ),
+                _ => false,
+            };
+            Ok(Variant::Bool(if op == BinOp::In { contained } else { !contained }))
+        }
         BinOp::Mod => match (&a, &b) {
             (Variant::Int(x), Variant::Int(y)) => {
                 if *y == 0 {
@@ -919,6 +938,17 @@ mod tests {
         assert_eq!(v, Variant::Int(2));
         // Out-of-range indexing yields nil, like the evaluator's read path.
         assert_eq!(run("[1, 2][5]").unwrap(), Variant::Nil);
+    }
+
+    #[test]
+    fn in_operator_checks_containment() {
+        assert_eq!(run("2 in [1, 2, 3]").unwrap(), Variant::Bool(true));
+        assert_eq!(run("5 in [1, 2]").unwrap(), Variant::Bool(false));
+        assert_eq!(run("\"ll\" in \"hello\"").unwrap(), Variant::Bool(true));
+        assert_eq!(run("\"z\" in \"hello\"").unwrap(), Variant::Bool(false));
+        assert_eq!(run("\"k\" in { \"k\": 1 }").unwrap(), Variant::Bool(true));
+        assert_eq!(run("5 not in [1, 2]").unwrap(), Variant::Bool(true));
+        assert_eq!(run("2 not in [1, 2]").unwrap(), Variant::Bool(false));
     }
 
     #[test]
