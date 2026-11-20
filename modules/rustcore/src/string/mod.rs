@@ -12,5 +12,6 @@ pub mod plural_rules;
 pub mod string_builder;
 pub mod string_name;
 pub mod translation;
+pub mod translation_domain;
 pub mod char_utils;
 pub mod escape;
