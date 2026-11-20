@@ -71,6 +71,7 @@ pub mod node_3d;
 pub mod node2d_extras;
 pub mod node_tree;
 pub mod occluder_3d;
+pub mod option_button;
 pub mod panel_container;
 pub mod parallax_2d;
 pub mod parallax_layer;
