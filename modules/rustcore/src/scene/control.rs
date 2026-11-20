@@ -33,6 +33,16 @@ pub enum LayoutPreset {
     FullRect,
 }
 
+/// `Control::SizeFlags` bits. `SHRINK_BEGIN` is 0, so the absence of the other
+/// flags means "shrink to the minimum at the start".
+pub mod size_flags {
+    pub const FILL: u32 = 1;
+    pub const EXPAND: u32 = 2;
+    pub const EXPAND_FILL: u32 = EXPAND | FILL;
+    pub const SHRINK_CENTER: u32 = 4;
+    pub const SHRINK_END: u32 = 8;
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ControlData {
     /// `[left, top, right, bottom]`, in 0..1 of the parent.
@@ -40,6 +50,9 @@ pub struct ControlData {
     /// `[left, top, right, bottom]` in pixels.
     offsets: [f32; 4],
     custom_min_size: Vector2,
+    size_flags_horizontal: u32,
+    size_flags_vertical: u32,
+    stretch_ratio: f32,
 }
 
 impl Default for ControlData {
@@ -54,6 +67,9 @@ impl ControlData {
             anchors: [0.0, 0.0, 0.0, 0.0],
             offsets: [0.0, 0.0, 0.0, 0.0],
             custom_min_size: Vector2::ZERO,
+            size_flags_horizontal: size_flags::FILL,
+            size_flags_vertical: size_flags::FILL,
+            stretch_ratio: 1.0,
         }
     }
 
@@ -108,6 +124,64 @@ impl ControlData {
 
     pub fn get_custom_minimum_size(&self) -> Vector2 {
         self.custom_min_size
+    }
+
+    pub fn set_size_flags_horizontal(&mut self, flags: u32) {
+        self.size_flags_horizontal = flags;
+    }
+
+    pub fn get_size_flags_horizontal(&self) -> u32 {
+        self.size_flags_horizontal
+    }
+
+    pub fn set_size_flags_vertical(&mut self, flags: u32) {
+        self.size_flags_vertical = flags;
+    }
+
+    pub fn get_size_flags_vertical(&self) -> u32 {
+        self.size_flags_vertical
+    }
+
+    pub fn set_stretch_ratio(&mut self, ratio: f32) {
+        self.stretch_ratio = ratio;
+    }
+
+    pub fn get_stretch_ratio(&self) -> f32 {
+        self.stretch_ratio
+    }
+
+    fn axis_rect(pos: f32, cell: f32, min: f32, flags: u32) -> (f32, f32) {
+        let size = if flags & size_flags::EXPAND != 0 || flags & size_flags::FILL != 0 {
+            cell.max(min)
+        } else {
+            min
+        };
+        let start = if flags & size_flags::SHRINK_CENTER != 0 {
+            pos + (cell - size) / 2.0
+        } else if flags & size_flags::SHRINK_END != 0 {
+            pos + (cell - size)
+        } else {
+            pos
+        };
+        (start, size)
+    }
+
+    /// Places this control inside the cell a container assigned to it, honouring
+    /// the size flags: FILL/EXPAND take the cell, SHRINK_CENTER/SHRINK_END\n    /// keep the minimum size and align it.
+    pub fn layout_in_cell(&self, cell: Rect2, min_size: Vector2) -> Rect2 {
+        let (x, w) = Self::axis_rect(
+            cell.position.x,
+            cell.size.x,
+            min_size.x,
+            self.size_flags_horizontal,
+        );
+        let (y, h) = Self::axis_rect(
+            cell.position.y,
+            cell.size.y,
+            min_size.y,
+            self.size_flags_vertical,
+        );
+        Rect2::new(Vector2::new(x, y), Vector2::new(w, h))
     }
 
     /// `get_rect`, with the minimum size enforced on the result.
@@ -237,6 +311,57 @@ mod tests {
         // Negative minimums are clamped at zero.
         c.set_custom_minimum_size(Vector2::new(-5.0, -5.0));
         assert_eq!(c.get_custom_minimum_size(), Vector2::ZERO);
+    }
+
+    #[test]
+    fn size_flags_fill_shrink_center_and_end() {
+        use size_flags::*;
+        let cell = Rect2::new(Vector2::new(10.0, 20.0), Vector2::new(100.0, 40.0));
+        let min = Vector2::new(20.0, 10.0);
+
+        // Default is FILL on both axes.
+        let c = ControlData::new();
+        assert_eq!(c.get_size_flags_horizontal(), FILL);
+        assert_eq!(c.get_size_flags_vertical(), FILL);
+        assert_eq!(c.get_stretch_ratio(), 1.0);
+        let r = c.layout_in_cell(cell, min);
+        assert_eq!(r, cell);
+
+        // Shrink center: minimum size, centred inside the cell.
+        let mut s = ControlData::new();
+        s.set_size_flags_horizontal(SHRINK_CENTER);
+        s.set_size_flags_vertical(SHRINK_CENTER);
+        let r = s.layout_in_cell(cell, min);
+        assert_eq!(r.position, Vector2::new(50.0, 35.0));
+        assert_eq!(r.size, min);
+
+        // Shrink end on X, shrink begin (0) on Y.
+        let mut e = ControlData::new();
+        e.set_size_flags_horizontal(SHRINK_END);
+        e.set_size_flags_vertical(0);
+        let r = e.layout_in_cell(cell, min);
+        assert_eq!(r.position, Vector2::new(90.0, 20.0));
+        assert_eq!(r.size, min);
+    }
+
+    #[test]
+    fn expand_and_stretch_ratio_are_stored() {
+        use size_flags::*;
+        let mut c = ControlData::new();
+        c.set_size_flags_horizontal(EXPAND_FILL);
+        c.set_stretch_ratio(2.5);
+        assert_eq!(c.get_size_flags_horizontal() & EXPAND, EXPAND);
+        assert_eq!(c.get_size_flags_horizontal() & FILL, FILL);
+        assert!((c.get_stretch_ratio() - 2.5).abs() < 1e-6);
+
+        // Expand alone still takes the cell size.
+        let mut e = ControlData::new();
+        e.set_size_flags_horizontal(EXPAND);
+        let r = e.layout_in_cell(
+            Rect2::new(Vector2::ZERO, Vector2::new(80.0, 10.0)),
+            Vector2::new(10.0, 10.0),
+        );
+        assert_eq!(r.size.x, 80.0);
     }
 
     #[test]
