@@ -57,6 +57,7 @@ pub mod primitive_meshes;
 pub mod worlds;
 pub mod spring_arm_3d;
 pub mod spring_bone_collision;
+pub mod spring_bone_simulator_3d;
 pub mod path_nodes;
 pub mod occluders;
 pub mod parallax_and_heightfield;
