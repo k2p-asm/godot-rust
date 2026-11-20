@@ -8,6 +8,7 @@ pub mod color_names;
 pub mod delaunay_3d;
 pub mod disjoint_set;
 pub mod dynamic_bvh;
+pub mod expression;
 pub mod face3;
 pub mod fieldwise;
 pub mod funcs;

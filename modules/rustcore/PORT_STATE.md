@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **322 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **332 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -129,6 +129,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 
 | Unit | C++ source | Status |
 |---|---|---|
+| `math/expression.rs` | `core/math/expression.*` (subset) | tokenizer (numbers/strings/idents/operators), precedence-climbing parser, `Variant`-based evaluator: arithmetic, `%`, `**`, comparisons, `and/or/not` with short-circuit, bitwise/shifts, indexing, array/dict literals, variables, and ~25 math builtins. No `self`/member access, assignment or `in`. **Non-differential** |
 | `math/funcs.rs` | `core/math/math_funcs.h/.cpp` | complete except RNG globals |
 | `math/pcg.rs` | `core/math/random_pcg.*`, `thirdparty/misc/pcg.*` | complete, bit-exact |
 | `math/vector2.rs` | `core/math/vector2.*` | complete |
@@ -148,7 +149,8 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/node_2d.rs` | `scene/2d/node_2d.*` (data half) | position/rotation/scale/skew with the engine's lazy decomposition of `set_transform`, zero-scale clamp, `rotate`/`translate`, relative transform. `set_rotation_scale_and_skew` is differential (`t2.rs_skew*`). Parenting and notifications need the object layer |
 | `scene/canvas_item.rs` | `scene/main/canvas_item.*` (data half) | visibility with the cached `parent_visible_in_tree`, `modulate`/`self_modulate` + ancestor composition, `z_index` range check (`-4096..=4096`) and relative composition, `y_sort_enabled`, `show_behind_parent`, clip mode, light/visibility layers |
 | `scene/node.rs` | `scene/main/node.*` (data half) | name/owner, unique-name flag, `ProcessMode` (inherit/pausable/when-paused/always/disabled) with the engine resolution and `can_process` matrix, process/physics priorities, thread group, `inside_tree`, and the eight `set_process*` flags. **Non-differential** (needs the tree/object layer) |
-| `scene/sprite_2d.rs` | `scene/2d/sprite_2d.*` (geometry) | Texture reduced to its size; frame grid (`hframes`x`vframes`) with the engine frame/column retention rules, `frame_coords`, centered/offset/flip, region rect and filter clip, `get_rect`/`get_rects`. Drawing and `is_pixel_opaque` need pixels. **Non-differential** |\n| `scene/gradient.rs` | `scene/resources/gradient.*` | Offset-sorted stops, the engine binary search with its `middle--` correction and end clamping, Constant/Linear/Cubic modes, and sRGB / linear-sRGB / Oklab interpolation. **Non-differential** (`Resource`) |
+| `scene/sprite_2d.rs` | `scene/2d/sprite_2d.*` (geometry) | Texture reduced to its size; frame grid (`hframes`x`vframes`) with the engine frame/column retention rules, `frame_coords`, centered/offset/flip, region rect and filter clip, `get_rect`/`get_rects`. Drawing and `is_pixel_opaque` need pixels. **Non-differential** |
+| `scene/gradient.rs` | `scene/resources/gradient.*` | Offset-sorted stops, the engine binary search with its `middle--` correction and end clamping, Constant/Linear/Cubic modes, and sRGB / linear-sRGB / Oklab interpolation. **Non-differential** (`Resource`) |
 | `scene/curve_3d.rs` | `scene/resources/curve.*` (Curve3D core) | same tessellation as Curve2D with `Vector3`, plus `closed` wrapping (the last interval ends at point 0). Tilts/up vectors/rotation sampling not ported. **Non-differential** |
 | `scene/curve_2d.rs` | `scene/resources/curve.*` (Curve2D core) | points with in/out controls, cubic Bézier `sample`/`samplef`, even-length tessellation (depth 10, `bake_interval` 5.0), cumulative arc lengths, `sample_baked` (linear and cubic) with clamping. Tilts/posture and Curve3D not ported. **Non-differential** |
 | `scene/curve.rs` | `scene/resources/curve.*` (1D core) | ordered points clamped to the value/domain ranges, lower-bound `get_index`, cubic Bézier `sample` with the engine's one-third control points, auto (linear) tangents, bake cache and `sample_baked`. Curve2D/3D not ported. **Non-differential** (`Resource` pulls `ClassDB`) |
@@ -164,7 +166,8 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `object/mod.rs` | `core/object/object.h`, `ref_counted.*` | `ObjectId` (unique, never reused, `is_valid`), `Object` lifetime registry, `RefCounted` ref/unref that destroys at zero. **Non-differential** |
 | `object/class_db.rs` | `core/object/class_db.*` | Class hierarchy, inherited method lookup, `ObjectId` -> class binding, `bind_method` + `call` with arity/payload validation, properties (`register_property`, `property_list` with inheritance, `property_get/set`, `clear_property_values`), signals (`register_signal`, `signal_list` with inheritance, `connect_signal`/`disconnect_signal`, `emit_signal` returning targets, `clear_signal_connections`, typed properties, `PropertyHint`/usage flags via `register_property_ex` + `property_meta` (inherit-aware)). **Non-differential** |
 | `variant/mod.rs` | `core/variant/variant.h` | `Variant::Type` tags (all 39, verified against the engine enum) + POD payloads, `Object`, `Callable`, `Signal` (identity-backed), `Dictionary`/`Array` of variants, all 10 typed arrays with payloads, `dict_get/set/keys`, `array_get/push/len`, `booleanize`, `to_int`/`to_float` |
-| `variant/compare.rs` | `core/variant/variant_op.cpp` (comparisons/conversions) | `compare` (numeric cross-type, bool, string, Vector2/3 lexicographic), `equals`, `can_convert`/`convert` for the numeric/bool/string subset, `stringify`, and `get_index` for Array/Dictionary. Feeds the pending Expression work. **Non-differential** |\n| `variant/ops.rs` | `core/variant/variant_op.cpp` (subset) | `+ - * /` for Int/Float/Vector2/Vector3/Vector4/Color incl. promotion and scalar scaling; `String + String` concatenates; int div-by-zero and all other invalid pairs yield `None`. **Non-differential** |
+| `variant/compare.rs` | `core/variant/variant_op.cpp` (comparisons/conversions) | `compare` (numeric cross-type, bool, string, Vector2/3 lexicographic), `equals`, `can_convert`/`convert` for the numeric/bool/string subset, `stringify`, and `get_index` for Array/Dictionary. Feeds the pending Expression work. **Non-differential** |
+| `variant/ops.rs` | `core/variant/variant_op.cpp` (subset) | `+ - * /` for Int/Float/Vector2/Vector3/Vector4/Color incl. promotion and scalar scaling; `String + String` concatenates; int div-by-zero and all other invalid pairs yield `None`. **Non-differential** |
 | `variant/serial.rs` | `core/variant/variant_parser.*` | Minimal `to_text`/`from_text` for nil/bool/int/float/String/Vector2/Vector3/Color/Array/Dictionary (nested). **Non-differential by design** |
 | `string/string_name.rs` | `core/string/string_name.h` | Interning pool (global, lock-protected), identity equality via `u64` id, djb2 `hash()`. Non-differential |
 | `string/num.rs` | `core/string/ustring.cpp` (`num_int64`/`num_uint64`) | bases 2-36, INT64_MIN, u64::MAX; plus `num_float` (fixed decimals, zero trimming, `-0.0`, inf/nan, 16-decimal cap, half-to-even rounding). **Non-differential** (see note 3) |
@@ -195,13 +198,13 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 
 ## Marked pending, with the reason
 
-- `core/math/expression.cpp` (1529 lines). It is a tokenizer + parser +
-  evaluator whose every node is a `Variant`, and the engine's operator tables
-  (`Variant::evaluate`, conversion matrices, `in`/`not in`, indexing, built-in
-  functions with overloads) are exactly what this port has not built yet.
-  A numeric-only subset would answer a different API under the same name, so it
-  stays pending until `Variant` has the conversion/evaluation tables. `scene/`
-  started instead.
+- `core/math/expression.cpp` is **partially ported** (`math/expression.rs`):
+  tokenizer, precedence-climbing parser, array/dictionary literals, variables,
+  indexing, unary `- ! ~`, `+ - * / % **`, comparisons, `and/or` with
+  short-circuit, bitwise/shifts, and a math builtin subset. Still missing:
+  `self`/member access, assignment, `in`/`not in`, and the engine's full
+  ~100-function builtin table. The engine's shunting-yard emits the same
+  precedences, but its node set is larger.
 
 ## Known open items
 
