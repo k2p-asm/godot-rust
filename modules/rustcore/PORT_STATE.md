@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **838 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **844 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -209,6 +209,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/geometry_3d.rs` | `core/math/geometry_3d.h` | 2 triangle tests, sphere/cylinder/convex segment tests, closest point on segment, barycentric coords, `point_in_projected_triangle`, `triangle_sphere_intersection_test`, `clip_polygon`, `get_support`, `project_range`, `get_closest_points_between_segments` + distance, `build_box_planes`, `build_cylinder_planes` (sides + caps), `build_sphere_planes`, `build_capsule_planes`, `compute_convex_mesh_points`, all verified |
 | `math/geometry_2d.rs` | `core/math/geometry_2d.h` | hit tests + `vec2_cross`, `convex_hull` (verified: 5 points, first repeated), `bresenham_line` (verified) |
 | `ffi.rs` | (new) | `gcr_variant_nil/bool/int/float/vector3`, `gcr_variant_type/as_int/as_float/as_vector3/booleanize`; verified inside the engine build (prints `variant tag = 2, truthy = 1` and `Rust packed sum = 256`) | **old**: C ABI: `gcr_abi_version`, `gcr_vector3_dot`, `gcr_vector3_normalized`, `gcr_transform3d_xform` |
+| `scene/animated_sprite_2d.rs` | `scene/2d/animated_sprite_2d.*` (playback state) | Frames assignment with animation-name repair (empty → `""` and autoplay cleared, missing → alphabetically first), frame clamping and `1/duration` speed scale, `play`/`play_backwards` with the engine's direction and boundary conditions, `pause`/`stop` differences, playing-speed reporting, and the centred/offset/flip flags. Signals/processing/drawing not ported. **Non-differential** |
 | `scene/option_button.rs` | `scene/gui/option_button.*` (items + selection) | Item store (text/icon/id/disabled/checked/radio/checkable/submenu/tooltip/metadata), add variants incl. separator and submenu, lookup by id and text, removal shifting the selection, and the selection rules: first selectable item auto-selected, separators never select themselves, `NONE_SELECTED` clears the text, reselect gated by `allow_reselect`, index validation. Popups/drawing not ported. **Non-differential** |
 | `string/escape.rs` | `core/string/ustring.cpp` (escaping) | `uri_encode` (unreserved set, upper-case hex), `uri_decode` with the engine's quirks (only upper-case hex accepted, `+` → space, `%` dropped when the second digit is invalid), `c_escape`/`c_unescape`, `c_escape_multiline`, `json_escape`, `xml_escape`/`xml_unescape` (named + decimal + hex entities, malformed left alone), `property_name_encode` and `get_invalid_node_name_characters`. **Non-differential** |
 | `string/case.rs` | `core/string/ustring.cpp` (`_separate_compound_words`, case conversions) | Compound-word splitting at `aA`, `AAa`/`2Aa`, `2aa` and `A2`/`a2` boundaries, whitespace/underscore/hyphen → space and lowercasing, then `capitalize`, `to_camel_case`, `to_pascal_case`, `to_snake_case`, `to_kebab_case`. **Non-differential** |

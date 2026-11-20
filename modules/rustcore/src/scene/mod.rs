@@ -4,6 +4,7 @@
 //! those nodes own, so they can be verified before the object layer exists.
 
 pub mod camera_2d;
+pub mod animated_sprite_2d;
 pub mod animation;
 pub mod animation_library;
 pub mod aspect_ratio_container;
