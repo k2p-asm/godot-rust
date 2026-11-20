@@ -17,6 +17,7 @@ pub mod curve_3d;
 pub mod gradient;
 pub mod gradient_texture;
 pub mod grid_container;
+pub mod gui_indicators;
 pub mod gui_misc;
 pub mod light_2d;
 pub mod line_2d;
