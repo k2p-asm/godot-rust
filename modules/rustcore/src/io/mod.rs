@@ -6,3 +6,4 @@ pub mod json_native;
 pub mod path_utils;
 pub mod resource_uid;
 pub mod variant_parser;
+pub mod xml_parser;
