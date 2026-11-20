@@ -1653,3 +1653,109 @@ fn variant_payloads_roundtrip() {
         assert_eq!(v, c);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Wave 20: TransformInterpolator.
+
+#[test]
+fn transform_interpolator_matches_cpp() {
+    use godot_core_rs::math::basis::{Basis, EulerOrder};
+    use godot_core_rs::math::transform_2d::Transform2D;
+    use godot_core_rs::math::transform_3d::Transform3D;
+    use godot_core_rs::math::transform_interpolator as ti;
+
+    let m = load();
+    let ib0 = Basis::from_euler(Vector3::new(0.2, -0.4, 0.7), EulerOrder::YXZ);
+    let ib1 = Basis::from_euler(Vector3::new(-0.3, 0.8, 0.1), EulerOrder::YXZ);
+
+    check(&m, "ti.method", &[method_code(ti::find_method(&ib0, &ib1))], 0.0);
+
+    let rb = ti::interpolate_basis(&ib0, &ib1, 0.35);
+    check(&m, "ti.b0", &c3(rb.get_column(0)), F32_TOL);
+    check(&m, "ti.b1", &c3(rb.get_column(1)), F32_TOL);
+    check(&m, "ti.b2", &c3(rb.get_column(2)), F32_TOL);
+
+    let it0 = Transform3D { basis: ib0, origin: Vector3::new(1.0, 2.0, 3.0) };
+    let it1 = Transform3D { basis: ib1, origin: Vector3::new(4.0, -5.0, 6.0) };
+    let itr = ti::interpolate_transform_3d(&it0, &it1, 0.25);
+    check(&m, "ti.origin", &c3(itr.origin), F32_TOL);
+    check(&m, "ti.tb0", &c3(itr.basis.get_column(0)), F32_TOL);
+    check(&m, "ti.checksum", &[ti::checksum_transform_3d(&itr) as f64], F32_TOL);
+
+    let mut is0 = ib0;
+    let mut is1 = ib1;
+    for (i, s) in [2.0f32, 3.0, 4.0].iter().enumerate() {
+        is0.set_column(i, is0.get_column(i) * *s);
+    }
+    for (i, s) in [5.0f32, 6.0, 7.0].iter().enumerate() {
+        is1.set_column(i, is1.get_column(i) * *s);
+    }
+    check(
+        &m,
+        "ti.method_scaled",
+        &[method_code(ti::find_method(&is0, &is1))],
+        0.0,
+    );
+    let irs = ti::interpolate_basis(&is0, &is1, 0.3);
+    check(&m, "ti.sb0", &c3(irs.get_column(0)), F32_TOL);
+    check(&m, "ti.sb2", &c3(irs.get_column(2)), F32_TOL);
+
+    let mut sheared = ib0;
+    sheared.set_column(0, Vector3::new(1.0, 0.3, 0.0));
+    check(
+        &m,
+        "ti.method_shear",
+        &[method_code(ti::find_method(&sheared, &ib1))],
+        0.0,
+    );
+
+    let t2a = Transform2D::from_rotation_origin(0.3, Vector2::new(0.0, 0.0));
+    let mut t2b = Transform2D::from_rotation_origin(0.3, Vector2::new(4.0, 2.0));
+    t2b.columns[0].x = -t2b.columns[0].x;
+    let r2 = ti::interpolate_transform_2d(&t2a, &t2b, 0.5);
+    check(
+        &m,
+        "ti.t2d_flip",
+        &[
+            r2.columns[0].x as f64,
+            r2.columns[0].y as f64,
+            r2.columns[1].x as f64,
+            r2.columns[1].y as f64,
+            r2.columns[2].x as f64,
+            r2.columns[2].y as f64,
+        ],
+        F32_TOL,
+    );
+
+    let r3 = ti::interpolate_transform_2d(
+        &t2a,
+        &Transform2D::from_rotation_origin(1.1, Vector2::new(2.0, 3.0)),
+        0.5,
+    );
+    check(
+        &m,
+        "ti.t2d",
+        &[
+            r3.columns[0].x as f64,
+            r3.columns[0].y as f64,
+            r3.columns[1].x as f64,
+            r3.columns[1].y as f64,
+            r3.columns[2].x as f64,
+            r3.columns[2].y as f64,
+        ],
+        F32_TOL,
+    );
+}
+
+fn method_code(m: godot_core_rs::math::transform_interpolator::Method) -> f64 {
+    use godot_core_rs::math::transform_interpolator::Method;
+    match m {
+        Method::Lerp => 0.0,
+        Method::Slerp => 1.0,
+        Method::ScaledSlerp => 2.0,
+    }
+}
+
+fn c3(v: Vector3) -> [f64; 3] {
+    [v.x as f64, v.y as f64, v.z as f64]
+}

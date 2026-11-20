@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **232 unit tests + 33 differential tests, 0 failures.**
+- `cargo test`: **240 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -142,6 +142,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/quaternion.rs` | `core/math/quaternion.*` | complete: rotation math, `get_euler` (6 orders, differential), `log`/`exp`, `slerp`/`slerpni`, spherical cubic interpolate (+ in-time), all verified against `quaternion.cpp` |
 | `math/basis.rs` | `core/math/basis.*` | core + all 6 Euler orders + axis-angle + `diagonalize`, `rotate_sh`, `rotref_posscale_decomposition` |
 | `math/transform_3d.rs` | `core/math/transform_3d.*` | complete incl. batch `xform_array`/`xform_array_inv` (verified) |
+| `math/transform_interpolator.rs` | `core/math/transform_interpolator.*` | `find_method`/`_test_basis` (lerp vs slerp vs scaled slerp, shear and zero-scale fallbacks), basis and transform interpolation, 2D handedness flip, checksum. **Differential**: `ti.*` keys generated from `transform_interpolator.cpp` |
 | `math/transform_2d.rs` | `core/math/transform_2d.*` | complete |
 | `math/vector4.rs` | `core/math/vector4.*` | complete (`Vector4i` pending) |
 | `math/face3.rs` | `core/math/face3.*` | plane/area/aabb/split_by_plane, exact `get_closest_point_to`, SAT `intersects_aabb` (verified). ray/segment via `geometry_3d`, support + project_range (all verified) |

@@ -26,6 +26,7 @@
 #include "core/math/projection.h"
 #include "core/math/transform_2d.h"
 #include "core/math/transform_3d.h"
+#include "core/math/transform_interpolator.h"
 #include "core/math/math_funcs.h"
 #include "core/math/random_pcg.h"
 #include "thirdparty/misc/pcg.h"
@@ -509,6 +510,60 @@ int main() {
 		printf("v4i.snap,%d,%d,%d,%d\n", sn.x, sn.y, sn.z, sn.w);
 		outi("v4i.min_axis", a.min_axis_index());
 		outi("v4i.max_axis", a.max_axis_index());
+	}
+
+	// --- TransformInterpolator
+	{
+		const Basis ib0 = Basis::from_euler(Vector3(0.2f, -0.4f, 0.7f));
+		const Basis ib1 = Basis::from_euler(Vector3(-0.3f, 0.8f, 0.1f));
+		outu("ti.method", (unsigned)TransformInterpolator::find_method(ib0, ib1));
+		Basis rb;
+		TransformInterpolator::interpolate_basis(ib0, ib1, rb, 0.35f);
+		out("ti.b0", rb.get_column(0));
+		out("ti.b1", rb.get_column(1));
+		out("ti.b2", rb.get_column(2));
+
+		const Transform3D it0(ib0, Vector3(1.0f, 2.0f, 3.0f));
+		const Transform3D it1(ib1, Vector3(4.0f, -5.0f, 6.0f));
+		Transform3D itr;
+		TransformInterpolator::interpolate_transform_3d(it0, it1, itr, 0.25f);
+		out("ti.origin", itr.origin);
+		out("ti.tb0", itr.basis.get_column(0));
+		outf("ti.checksum", TransformInterpolator::checksum_transform_3d(itr));
+
+		Basis is0 = ib0;
+		is0.set_column(0, is0.get_column(0) * 2.0f);
+		is0.set_column(1, is0.get_column(1) * 3.0f);
+		is0.set_column(2, is0.get_column(2) * 4.0f);
+		Basis is1 = ib1;
+		is1.set_column(0, is1.get_column(0) * 5.0f);
+		is1.set_column(1, is1.get_column(1) * 6.0f);
+		is1.set_column(2, is1.get_column(2) * 7.0f);
+		outu("ti.method_scaled", (unsigned)TransformInterpolator::find_method(is0, is1));
+		Basis irs;
+		TransformInterpolator::interpolate_basis(is0, is1, irs, 0.3f);
+		out("ti.sb0", irs.get_column(0));
+		out("ti.sb2", irs.get_column(2));
+
+		Basis isheared = ib0;
+		isheared.set_column(0, Vector3(1.0f, 0.3f, 0.0f));
+		outu("ti.method_shear", (unsigned)TransformInterpolator::find_method(isheared, ib1));
+
+		Transform2D t2a(0.3f, Vector2(0.0f, 0.0f));
+		Transform2D t2b(0.3f, Vector2(4.0f, 2.0f));
+		t2b.columns[0].x = -t2b.columns[0].x;
+		Transform2D r2;
+		TransformInterpolator::interpolate_transform_2d(t2a, t2b, r2, 0.5f);
+		printf("ti.t2d_flip,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g\n",
+				(double)r2.columns[0].x, (double)r2.columns[0].y,
+				(double)r2.columns[1].x, (double)r2.columns[1].y,
+				(double)r2.columns[2].x, (double)r2.columns[2].y);
+
+		TransformInterpolator::interpolate_transform_2d(t2a, Transform2D(1.1f, Vector2(2.0f, 3.0f)), r2, 0.5f);
+		printf("ti.t2d,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g\n",
+				(double)r2.columns[0].x, (double)r2.columns[0].y,
+				(double)r2.columns[1].x, (double)r2.columns[1].y,
+				(double)r2.columns[2].x, (double)r2.columns[2].y);
 	}
 
 	// --- Face3

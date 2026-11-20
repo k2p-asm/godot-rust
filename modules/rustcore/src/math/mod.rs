@@ -23,6 +23,7 @@ pub mod rect2;
 pub mod rect2i;
 pub mod transform_2d;
 pub mod transform_3d;
+pub mod transform_interpolator;
 pub mod triangle_mesh;
 pub mod triangulate;
 pub mod triangle_mesh_bvh;
