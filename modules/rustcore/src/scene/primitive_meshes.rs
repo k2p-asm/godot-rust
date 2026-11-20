@@ -257,6 +257,100 @@ impl CylinderMeshData {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i32)]
+pub enum PlaneOrientation {
+    FaceX,
+    FaceY,
+    FaceZ,
+}
+
+/// `_create_mesh_array` output for the ported generators.
+#[derive(Clone, Debug, Default)]
+pub struct GeneratedArrays {
+    pub points: Vec<Vector3>,
+    pub normals: Vec<Vector3>,
+    /// Four floats per vertex (`xyz`, `w`).
+    pub tangents: Vec<f32>,
+    pub uvs: Vec<crate::math::vector2::Vector2>,
+    pub indices: Vec<i32>,
+}
+
+/// `PlaneMesh::_create_mesh_array`.
+pub fn generate_plane_arrays(
+    size: crate::math::vector2::Vector2,
+    subdivide_w: i32,
+    subdivide_d: i32,
+    center_offset: Vector3,
+    orientation: PlaneOrientation,
+) -> GeneratedArrays {
+    let start_x = size.x * -0.5;
+    let start_z = size.y * -0.5;
+
+    let normal = match orientation {
+        PlaneOrientation::FaceX => Vector3::new(1.0, 0.0, 0.0),
+        PlaneOrientation::FaceY => Vector3::new(0.0, 1.0, 0.0),
+        PlaneOrientation::FaceZ => Vector3::new(0.0, 0.0, 1.0),
+    };
+
+    let mut arrays = GeneratedArrays::default();
+    let num_points = ((subdivide_d + 2) * (subdivide_w + 2)) as usize;
+    arrays.points.reserve(num_points);
+    arrays.normals.reserve(num_points);
+    arrays.tangents.reserve(num_points * 4);
+    arrays.uvs.reserve(num_points);
+    arrays
+        .indices
+        .reserve(((subdivide_d + 1) * (subdivide_w + 1) * 6) as usize);
+
+    let mut point = 0i32;
+    let mut z = start_z;
+    let mut thisrow = point;
+    let mut prevrow = 0i32;
+
+    for j in 0..=(subdivide_d + 1) {
+        let mut x = start_x;
+        for i in 0..=(subdivide_w + 1) {
+            let u = i as f32 / (subdivide_w + 1) as f32;
+            let v = j as f32 / (subdivide_d + 1) as f32;
+
+            let position = match orientation {
+                PlaneOrientation::FaceX => Vector3::new(0.0, z, x),
+                PlaneOrientation::FaceY => Vector3::new(-x, 0.0, -z),
+                PlaneOrientation::FaceZ => Vector3::new(-x, z, 0.0),
+            };
+            arrays.points.push(position + center_offset);
+            arrays.normals.push(normal);
+            if orientation == PlaneOrientation::FaceX {
+                arrays.tangents.extend_from_slice(&[0.0, 0.0, -1.0, 1.0]);
+            } else {
+                arrays.tangents.extend_from_slice(&[1.0, 0.0, 0.0, 1.0]);
+            }
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(1.0 - u, 1.0 - v));
+            point += 1;
+
+            if i > 0 && j > 0 {
+                arrays.indices.push(prevrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i);
+                arrays.indices.push(thisrow + i - 1);
+            }
+
+            x += size.x / (subdivide_w + 1) as f32;
+        }
+
+        z += size.y / (subdivide_d + 1) as f32;
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    arrays
+}
+
 #[derive(Clone, Debug)]
 pub struct PlaneMeshData {
     pub params: PrimitiveMeshParams,
@@ -264,6 +358,7 @@ pub struct PlaneMeshData {
     subdivide_w: i32,
     subdivide_d: i32,
     center_offset: Vector3,
+    orientation: PlaneOrientation,
 }
 
 impl Default for PlaneMeshData {
@@ -280,6 +375,7 @@ impl PlaneMeshData {
             subdivide_w: 0,
             subdivide_d: 0,
             center_offset: Vector3::ZERO,
+            orientation: PlaneOrientation::FaceY,
         }
     }
 
@@ -310,6 +406,26 @@ impl PlaneMeshData {
     pub fn set_center_offset(&mut self, offset: Vector3) {
         self.center_offset = offset;
     }
+    pub fn set_orientation(&mut self, orientation: PlaneOrientation) {
+        self.orientation = orientation;
+    }
+
+    pub fn get_orientation(&self) -> PlaneOrientation {
+        self.orientation
+    }
+
+    /// _create_mesh_array with this mesh's parameters.
+    pub fn generate_arrays(&self) -> GeneratedArrays {
+        generate_plane_arrays(
+            self.size,
+            self.subdivide_w,
+            self.subdivide_d,
+            self.center_offset,
+            self.orientation,
+        )
+    }
+
+
 
     pub fn get_center_offset(&self) -> Vector3 {
         self.center_offset
@@ -697,5 +813,77 @@ mod tests {
         assert!(t.set_ring_segments(3));
         assert_eq!(t.get_rings(), 3);
         assert_eq!(t.get_ring_segments(), 3);
+    }
+
+    #[test]
+    fn plane_arrays_default_grid() {
+        // 2×2 plane, no subdivision: (0+2)*(0+2) = 4 vertices, 1 quad = 6 indices.
+        let arrays = generate_plane_arrays(
+            Vector2::new(2.0, 2.0),
+            0,
+            0,
+            Vector3::ZERO,
+            PlaneOrientation::FaceY,
+        );
+        assert_eq!(arrays.points.len(), 4);
+        assert_eq!(arrays.normals.len(), 4);
+        assert_eq!(arrays.tangents.len(), 16);
+        assert_eq!(arrays.uvs.len(), 4);
+        assert_eq!(arrays.indices.len(), 6);
+
+        // Facing +Y, corners at ±1 with UVs flipped (1-u, 1-v).
+        // FACE_Y maps (x, z) to (-x, 0, -z), so the first corner is (1, 0, 1).
+        assert_eq!(arrays.points[0], Vector3::new(1.0, 0.0, 1.0));
+        assert_eq!(arrays.normals[0], Vector3::UP);
+        assert_eq!(arrays.uvs[0], Vector2::new(1.0, 1.0));
+        assert_eq!(arrays.uvs[3], Vector2::new(0.0, 0.0));
+        assert!(arrays.indices.iter().all(|&i| (0..4).contains(&i)));
+    }
+
+    #[test]
+    fn plane_arrays_subdivisions_and_orientation() {
+        let arrays = generate_plane_arrays(
+            Vector2::new(2.0, 2.0),
+            1,
+            1,
+            Vector3::new(0.0, 1.0, 0.0),
+            PlaneOrientation::FaceY,
+        );
+        // (1+2)^2 = 9 vertices, 4 quads * 6 = 24 indices.
+        assert_eq!(arrays.points.len(), 9);
+        assert_eq!(arrays.indices.len(), 24);
+        // The centre offset is applied to every point.
+        assert!(arrays.points.iter().all(|p| (p.y - 1.0).abs() < 1e-6));
+
+        // Face X uses the YZ plane with a -Z tangent.
+        let x = generate_plane_arrays(
+            Vector2::new(2.0, 2.0),
+            0,
+            0,
+            Vector3::ZERO,
+            PlaneOrientation::FaceX,
+        );
+        assert_eq!(x.normals[0], Vector3::new(1.0, 0.0, 0.0));
+        assert_eq!(&x.tangents[0..4], &[0.0, 0.0, -1.0, 1.0]);
+
+        let z = generate_plane_arrays(
+            Vector2::new(2.0, 2.0),
+            0,
+            0,
+            Vector3::ZERO,
+            PlaneOrientation::FaceZ,
+        );
+        assert_eq!(z.normals[0], Vector3::new(0.0, 0.0, 1.0));
+
+        // The mesh wrapper uses its own parameters.
+        let mut p = PlaneMeshData::new();
+        p.set_subdivide_width(1);
+        p.set_subdivide_depth(1);
+        p.set_orientation(PlaneOrientation::FaceZ);
+        let arrays = p.generate_arrays();
+        assert_eq!(arrays.points.len(), 9);
+        assert_eq!(p.get_orientation(), PlaneOrientation::FaceZ);
+        assert_eq!(PlaneOrientation::FaceX as i32, 0);
+        assert_eq!(PlaneOrientation::FaceZ as i32, 2);
     }
 }
