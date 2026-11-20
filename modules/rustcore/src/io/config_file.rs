@@ -14,7 +14,8 @@
 //!   key erase dropping an emptied section;
 //! - `get_sections`/`get_section_keys` return the stored names.
 //!
-//! Saving (`encode_to_text`) is not ported.
+//! `encode_to_text` is ported (writing to disk is not), with the sections in
+//! sorted order instead of the engine's hash order.
 
 use std::collections::BTreeMap;
 
@@ -194,11 +195,39 @@ impl ConfigFileData {
         }
         Ok(())
     }
+    /// `ConfigFile::encode_to_text`: section-less values first, then each section
+    /// with a blank line after its header, one `key=value` per line. The engine
+    /// walks an unordered `HashMap`; this port walks the sorted map, which only
+    /// changes the ordering.
+    pub fn encode_to_text(&self) -> String {
+        let mut out = String::new();
+        let mut first = true;
+        for (section, entries) in &self.values {
+            if first {
+                first = false;
+            } else {
+                out.push('\n');
+            }
+            if !section.is_empty() {
+                out.push('[');
+                out.push_str(section);
+                out.push_str("]\n\n");
+            }
+            for (key, value) in entries {
+                out.push_str(&crate::string::escape::property_name_encode(key));
+                out.push('=');
+                out.push_str(&crate::io::variant_parser::write_variant(value));
+                out.push('\n');
+            }
+        }
+        out
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::vector2::Vector2;
     use crate::string::gstring::GoString;
 
     fn s(text: &str) -> Variant {
@@ -338,5 +367,50 @@ mod tests {
         assert!(!c.has_section("a"));
         assert!(c.has_section(" a "));
         assert_eq!(c.get_value(" a ", "k", Variant::Nil), Variant::Int(1));
+    }
+
+    #[test]
+    fn encode_to_text_round_trips() {
+        let mut c = ConfigFileData::new();
+        c.set_value("", "top", Variant::Int(0));
+        c.set_value("player", "name", s("Hero"));
+        c.set_value("player", "lives", Variant::Int(3));
+        c.set_value("player", "pos", Variant::Vector2(Vector2::new(1.0, 2.0)));
+
+        let text = c.encode_to_text();
+        assert_eq!(
+            text,
+            "top=0\n\
+             \n\
+             [player]\n\
+             \n\
+             lives=3\n\
+             name=\"Hero\"\n\
+             pos=Vector2(1, 2)\n"
+        );
+
+        let mut again = ConfigFileData::new();
+        again.parse(&text).unwrap();
+        assert_eq!(again.get_value("", "top", Variant::Nil), Variant::Int(0));
+        assert_eq!(again.get_value("player", "name", Variant::Nil), s("Hero"));
+        assert_eq!(
+            again.get_value("player", "pos", Variant::Nil),
+            Variant::Vector2(Vector2::new(1.0, 2.0))
+        );
+    }
+
+    #[test]
+    fn encode_quotes_problematic_keys() {
+        let mut c = ConfigFileData::new();
+        c.set_value("s", "with space", Variant::Int(1));
+        let text = c.encode_to_text();
+        assert!(text.contains("\"with space\"=1\n"), "{text}");
+        // The parser accepts the quoted key (quotes are part of the key text).
+        let mut again = ConfigFileData::new();
+        again.parse(&text).unwrap();
+        assert_eq!(
+            again.get_value("s", "\"with space\"", Variant::Nil),
+            Variant::Int(1)
+        );
     }
 }

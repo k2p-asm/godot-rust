@@ -768,6 +768,256 @@ pub fn parse_construct_args(text: &str) -> Result<Vec<f64>, ParseError> {
     Ok(args)
 }
 
+/// `VariantWriter` formatting for the port's variant types.
+///
+/// Floats go through `string::num::num_float(value, -1)`, the port's placeholder
+/// for `String::num` (14 significant decimals trimmed); everything else follows
+/// the engine's text exactly: strings use `c_escape_multiline`, constructors use
+/// `", "` separators, arrays `[a, b]` and dictionaries `{\n"k": v,\n...\n}` with
+/// sorted keys.
+pub fn write_variant(value: &Variant) -> String {
+    fn num(v: f64) -> String {
+        crate::string::num::num_float(v, -1).as_string()
+    }
+    fn float_literal(v: f64) -> String {
+        let text = num(v);
+        if text != "inf"
+            && text != "-inf"
+            && text != "nan"
+            && !text.contains('.')
+            && !text.contains('e')
+            && !text.contains('E')
+        {
+            text + ".0"
+        } else {
+            text
+        }
+    }
+
+    match value {
+        Variant::Nil => "null".to_string(),
+        Variant::Bool(true) => "true".to_string(),
+        Variant::Bool(false) => "false".to_string(),
+        Variant::Int(v) => v.to_string(),
+        Variant::Float(v) => float_literal(*v),
+        Variant::String(s) => format!("\"{}\"", crate::string::escape::c_escape_multiline(&s.as_string())),
+        Variant::Vector2(v) => format!("Vector2({}, {})", num(v.x as f64), num(v.y as f64)),
+        Variant::Vector2i(v) => format!("Vector2i({}, {})", v.x, v.y),
+        Variant::Rect2(r) => format!(
+            "Rect2({}, {}, {}, {})",
+            num(r.position.x as f64),
+            num(r.position.y as f64),
+            num(r.size.x as f64),
+            num(r.size.y as f64)
+        ),
+        Variant::Rect2i(r) => format!(
+            "Rect2i({}, {}, {}, {})",
+            r.position.x, r.position.y, r.size.x, r.size.y
+        ),
+        Variant::Vector3(v) => format!(
+            "Vector3({}, {}, {})",
+            num(v.x as f64),
+            num(v.y as f64),
+            num(v.z as f64)
+        ),
+        Variant::Vector3i(v) => format!("Vector3i({}, {}, {})", v.x, v.y, v.z),
+        Variant::Vector4(v) => format!(
+            "Vector4({}, {}, {}, {})",
+            num(v.x as f64),
+            num(v.y as f64),
+            num(v.z as f64),
+            num(v.w as f64)
+        ),
+        Variant::Vector4i(v) => format!("Vector4i({}, {}, {}, {})", v.x, v.y, v.z, v.w),
+        Variant::Plane(p) => format!(
+            "Plane({}, {}, {}, {})",
+            num(p.normal.x as f64),
+            num(p.normal.y as f64),
+            num(p.normal.z as f64),
+            num(p.d as f64)
+        ),
+        Variant::Quaternion(q) => format!(
+            "Quaternion({}, {}, {}, {})",
+            num(q.x as f64),
+            num(q.y as f64),
+            num(q.z as f64),
+            num(q.w as f64)
+        ),
+        Variant::Aabb(a) => format!(
+            "AABB({}, {}, {}, {}, {}, {})",
+            num(a.position.x as f64),
+            num(a.position.y as f64),
+            num(a.position.z as f64),
+            num(a.size.x as f64),
+            num(a.size.y as f64),
+            num(a.size.z as f64)
+        ),
+        Variant::Basis(b) => {
+            let mut parts = Vec::with_capacity(9);
+            for column in 0..3 {
+                let c = b.get_column(column);
+                parts.push(num(c.x as f64));
+                parts.push(num(c.y as f64));
+                parts.push(num(c.z as f64));
+            }
+            format!("Basis({})", parts.join(", "))
+        }
+        Variant::Transform2D(t) => {
+            let mut parts = Vec::with_capacity(6);
+            for column in &t.columns {
+                parts.push(num(column.x as f64));
+                parts.push(num(column.y as f64));
+            }
+            format!("Transform2D({})", parts.join(", "))
+        }
+        Variant::Transform3D(t) => {
+            let mut parts = Vec::with_capacity(12);
+            for column in 0..3 {
+                let c = t.basis.get_column(column);
+                parts.push(num(c.x as f64));
+                parts.push(num(c.y as f64));
+                parts.push(num(c.z as f64));
+            }
+            parts.push(num(t.origin.x as f64));
+            parts.push(num(t.origin.y as f64));
+            parts.push(num(t.origin.z as f64));
+            format!("Transform3D({})", parts.join(", "))
+        }
+        Variant::Projection(p) => {
+            let mut parts = Vec::with_capacity(16);
+            for column in &p.columns {
+                parts.push(num(column.x as f64));
+                parts.push(num(column.y as f64));
+                parts.push(num(column.z as f64));
+                parts.push(num(column.w as f64));
+            }
+            format!("Projection({})", parts.join(", "))
+        }
+        Variant::Color(c) => format!(
+            "Color({}, {}, {}, {})",
+            num(c.r as f64),
+            num(c.g as f64),
+            num(c.b as f64),
+            num(c.a as f64)
+        ),
+        Variant::Array(items) => {
+            let parts: Vec<String> = items.iter().map(write_variant).collect();
+            format!("[{}]", parts.join(", "))
+        }
+        Variant::Dictionary(map) => {
+            if map.is_empty() {
+                return "{}".to_string();
+            }
+            let mut keys: Vec<&StringName> = map.keys().collect();
+            keys.sort_by_key(|k| k.as_string());
+            let mut out = String::from("{\n");
+            for (index, key) in keys.iter().enumerate() {
+                out.push('"');
+                out.push_str(&crate::string::escape::c_escape_multiline(&key.as_string()));
+                out.push_str("\": ");
+                out.push_str(&write_variant(&map[*key]));
+                if index + 1 < keys.len() {
+                    out.push_str(",\n");
+                } else {
+                    out.push('\n');
+                }
+            }
+            out.push('}');
+            out
+        }
+        Variant::PackedByteArray(values) => format!(
+            "PackedByteArray({})",
+            values
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Variant::PackedInt32Array(values) => format!(
+            "PackedInt32Array({})",
+            values
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Variant::PackedInt64Array(values) => format!(
+            "PackedInt64Array({})",
+            values
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Variant::PackedFloat32Array(values) => format!(
+            "PackedFloat32Array({})",
+            values
+                .iter()
+                .map(|v| num(*v as f64))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Variant::PackedFloat64Array(values) => format!(
+            "PackedFloat64Array({})",
+            values
+                .iter()
+                .map(|v| num(*v))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Variant::PackedStringArray(values) => format!(
+            "PackedStringArray({})",
+            values
+                .iter()
+                .map(|v| format!(
+                    "\"{}\"",
+                    crate::string::escape::c_escape_multiline(&v.as_string())
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        Variant::PackedVector2Array(values) => {
+            let mut parts = Vec::with_capacity(values.len() * 2);
+            for v in values {
+                parts.push(num(v.x as f64));
+                parts.push(num(v.y as f64));
+            }
+            format!("PackedVector2Array({})", parts.join(", "))
+        }
+        Variant::PackedVector3Array(values) => {
+            let mut parts = Vec::with_capacity(values.len() * 3);
+            for v in values {
+                parts.push(num(v.x as f64));
+                parts.push(num(v.y as f64));
+                parts.push(num(v.z as f64));
+            }
+            format!("PackedVector3Array({})", parts.join(", "))
+        }
+        Variant::PackedColorArray(values) => {
+            let mut parts = Vec::with_capacity(values.len() * 4);
+            for v in values {
+                parts.push(num(v.r as f64));
+                parts.push(num(v.g as f64));
+                parts.push(num(v.b as f64));
+                parts.push(num(v.a as f64));
+            }
+            format!("PackedColorArray({})", parts.join(", "))
+        }
+        Variant::PackedVector4Array(values) => {
+            let mut parts = Vec::with_capacity(values.len() * 4);
+            for v in values {
+                parts.push(num(v.x as f64));
+                parts.push(num(v.y as f64));
+                parts.push(num(v.z as f64));
+                parts.push(num(v.w as f64));
+            }
+            format!("PackedVector4Array({})", parts.join(", "))
+        }
+        // Objects, callables and signals have no text form here.
+        Variant::Object(_) | Variant::Callable(_) | Variant::Signal(_) => "null".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -947,6 +1197,100 @@ mod tests {
             parse("{1: 2}").unwrap_err().message,
             "Dictionary keys must be strings in this port"
         );
+    }
+
+    #[test]
+    fn write_scalars_and_math() {
+        assert_eq!(write_variant(&Variant::Nil), "null");
+        assert_eq!(write_variant(&Variant::Bool(true)), "true");
+        assert_eq!(write_variant(&Variant::Int(-7)), "-7");
+        assert_eq!(write_variant(&Variant::Float(1.0)), "1.0");
+        assert_eq!(write_variant(&Variant::Float(1.5)), "1.5");
+        assert_eq!(
+            write_variant(&Variant::String(GoString::from_str("a\"b\\c"))),
+            "\"a\\\"b\\\\c\""
+        );
+
+        assert_eq!(
+            write_variant(&Variant::Vector2(Vector2::new(1.0, 2.0))),
+            "Vector2(1, 2)"
+        );
+        assert_eq!(
+            write_variant(&Variant::Vector3i(Vector3i::new(-1, 0, 2))),
+            "Vector3i(-1, 0, 2)"
+        );
+        assert_eq!(
+            write_variant(&Variant::Color(Color::new(1.0, 0.0, 0.0, 1.0))),
+            "Color(1, 0, 0, 1)"
+        );
+        assert_eq!(
+            write_variant(&Variant::Transform3D(Transform3D {
+                basis: Basis::IDENTITY,
+                origin: Vector3::new(5.0, 6.0, 7.0),
+            })),
+            "Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 6, 7)"
+        );
+    }
+
+    #[test]
+    fn write_containers_and_packed() {
+        assert_eq!(
+            write_variant(&Variant::Array(vec![Variant::Int(1), Variant::Bool(false)])),
+            "[1, false]"
+        );
+        assert_eq!(write_variant(&Variant::Array(vec![])), "[]");
+
+        let mut map = HashMap::new();
+        map.insert(StringName::new("b"), Variant::Int(2));
+        map.insert(StringName::new("a"), Variant::Int(1));
+        assert_eq!(
+            write_variant(&Variant::Dictionary(map)),
+            "{\n\"a\": 1,\n\"b\": 2\n}"
+        );
+        assert_eq!(
+            write_variant(&Variant::Dictionary(HashMap::new())),
+            "{}"
+        );
+
+        assert_eq!(
+            write_variant(&Variant::PackedInt32Array(vec![1, -2])),
+            "PackedInt32Array(1, -2)"
+        );
+        assert_eq!(
+            write_variant(&Variant::PackedStringArray(vec![
+                GoString::from_str("a"),
+                GoString::from_str("b")
+            ])),
+            "PackedStringArray(\"a\", \"b\")"
+        );
+        assert_eq!(
+            write_variant(&Variant::PackedVector2Array(vec![Vector2::new(1.0, 2.0)])),
+            "PackedVector2Array(1, 2)"
+        );
+    }
+
+    #[test]
+    fn write_then_parse_round_trips() {
+        let values = vec![
+            Variant::Nil,
+            Variant::Bool(true),
+            Variant::Int(-3),
+            Variant::Float(1.5),
+            Variant::String(GoString::from_str("x\"y")),
+            Variant::Vector2(Vector2::new(1.0, 2.0)),
+            Variant::Vector2i(Vector2i::new(-1, 4)),
+            Variant::Vector3(Vector3::new(1.0, 2.0, 3.0)),
+            Variant::Rect2(Rect2::new(Vector2::new(1.0, 2.0), Vector2::new(3.0, 4.0))),
+            Variant::Plane(Plane::new(0.0, 1.0, 0.0, -2.0)),
+            Variant::Quaternion(Quaternion::new(0.0, 0.0, 0.0, 1.0)),
+            Variant::Color(Color::new(0.5, 0.25, 1.0, 1.0)),
+            Variant::Array(vec![Variant::Int(1), Variant::Float(2.5)]),
+        ];
+        for value in values {
+            let text = write_variant(&value);
+            let parsed = parse(&text).unwrap_or_else(|e| panic!("{text}: {e}"));
+            assert_eq!(parsed, value, "{text}");
+        }
     }
 
     #[test]
