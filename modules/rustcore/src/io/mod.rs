@@ -23,5 +23,6 @@ pub mod resource_saver;
 pub mod resource_uid;
 pub mod stream_peer;
 pub mod translation_loader_po;
+pub mod udp_socket;
 pub mod variant_parser;
 pub mod xml_parser;
