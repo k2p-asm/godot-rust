@@ -26,6 +26,7 @@ pub mod cpu_particles_2d;
 pub mod curve;
 pub mod curve_2d;
 pub mod curve_3d;
+pub mod environment;
 pub mod gradient;
 pub mod gradient_texture;
 pub mod grid_container;
