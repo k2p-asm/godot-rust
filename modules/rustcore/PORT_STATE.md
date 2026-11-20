@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1074 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1079 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -224,6 +224,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/spring_arm_3d.rs` | `scene/3d/physics/spring_arm_3d.*` (state) | Spring length 1, hit length 0, mask 1, margin 0.01, optional shape and the excluded-object list with add/remove/clear; `get_hit_length` mirrors the cast result (settable here). Shape cast/process not ported. **Non-differential** |
 | `scene/worlds.rs` | `scene/resources/world_2d.*`, `scene/resources/3d/world_3d.*` (state) | Canvas/navigation-map/space handles and viewport count for 2D; scenario/space/navigation-map plus environment, fallback environment, camera attributes, compositor and the registered camera list for 3D. Server/lazy-map creation not ported. **Non-differential** |
 | `scene/popup_menu.rs` | `scene/gui/popup_menu.*` (items) | Item store with text/xl-text/icon+width+modulate, checkable type (box/radio), checked, multistate count/state, visibility, separator/disabled, id, metadata, submenu, tooltip and indent; all add variants incl. icon check/radio and separators; id/text lookups; every field accessor with the engine's empty returns; removal shifting current/focused; and the popup options (three hide-on-selection flags, search, native preference, system menu, search-bar trio). Shortcuts/native menu/drawing not ported. **Non-differential** |
+| `math/delaunay_2d.rs` | `core/math/delaunay_2d.h` | Bowyer–Watson triangulation ported operation for operation: 16× bounding triangle, circumcircle insertions, cavity edges with duplicate removal and the final bounding-vertex filter, with `create_triangle`'s circumcircle formula. `Geometry2D::triangulate_delaunay` flattens the indices. Tests cover the unit circumcircle, a square (two triangles), a centre point (four), degenerate collinear input and edge sorting. **Non-differential** |
 | `scene/skeleton_2d.rs` | `scene/2d/skeleton_2d.*` (bone table) | Ordered bone records (parent index, accumulated transform, rest inverse, local-pose override transform/amount/persistence), add/remove with child reparenting and index shifts, pose override set/get/clear, accum/rest setters, the two dirty flags with their triggers and the modification-stack handle. Node-based bone resolution/upload not ported. **Non-differential** |
 | `scene/shader_include.rs` | `scene/resources/shader_include.*` | Source code, include path, byte size and a unique dependency list driving reloads. Loading/change signals not ported. **Non-differential** |
 | `scene/bone_2d.rs` | `scene/2d/bone_2d.*` (rest state) | Identity rest, auto length/angle on, length 16, angle 0, skeleton index -1, cache transform and copy-to-cache flag, with `apply_rest` filling the cache and `get_skeleton_rest` returning the local rest (parent-chain composition documented as a deviation). **Non-differential** |

@@ -5,6 +5,7 @@ pub mod basis;
 pub mod color;
 pub mod convex_hull;
 pub mod color_names;
+pub mod delaunay_2d;
 pub mod delaunay_3d;
 pub mod disjoint_set;
 pub mod dynamic_bvh;
