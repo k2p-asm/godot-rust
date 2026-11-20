@@ -247,6 +247,66 @@ impl Curve3D {
         self.baked_points = baked;
     }
 
+    /// `get_closest_point`: brute force over the baked segments.
+    pub fn get_closest_point(&mut self, p: Vector3) -> Vector3 {
+        if self.baked_dirty {
+            self.bake();
+        }
+        if self.baked_points.is_empty() {
+            return Vector3::ZERO;
+        }
+        if self.baked_points.len() == 1 {
+            return self.baked_points[0];
+        }
+        let r = &self.baked_points;
+        let dist = &self.baked_dist;
+        let mut nearest = Vector3::ZERO;
+        let mut nearest_dist = -1.0f32;
+
+        for i in 0..r.len() - 1 {
+            let interval = dist[i + 1] - dist[i];
+            let origin = r[i];
+            let direction = (r[i + 1] - origin) / interval;
+            let d = (p - origin).dot(direction).clamp(0.0, interval);
+            let proj = origin + direction * d;
+            let dsq = proj.distance_squared_to(p);
+            if nearest_dist < 0.0 || dsq < nearest_dist {
+                nearest = proj;
+                nearest_dist = dsq;
+            }
+        }
+        nearest
+    }
+
+    /// `get_closest_offset`: same projection, returning the arc length.
+    pub fn get_closest_offset(&mut self, p: Vector3) -> f32 {
+        if self.baked_dirty {
+            self.bake();
+        }
+        if self.baked_points.len() < 2 {
+            return 0.0;
+        }
+        let r = &self.baked_points;
+        let dist = &self.baked_dist;
+        let mut nearest = 0.0f32;
+        let mut nearest_dist = -1.0f32;
+
+        for i in 0..r.len() - 1 {
+            let offset = dist[i];
+            let interval = dist[i + 1] - dist[i];
+            let origin = r[i];
+            let direction = (r[i + 1] - origin) / interval;
+            let d = (p - origin).dot(direction).clamp(0.0, interval);
+            let proj = origin + direction * d;
+            let dsq = proj.distance_squared_to(p);
+            if nearest_dist < 0.0 || dsq < nearest_dist {
+                nearest = offset + d;
+                nearest_dist = dsq;
+            }
+        }
+        nearest
+    }
+
     pub fn get_baked_length(&mut self) -> f32 {
         if self.baked_dirty {
             self.bake();
@@ -422,6 +482,29 @@ mod tests {
         assert!(mid.y > 1.0, "{mid:?}");
         let len = c.get_baked_length();
         assert!(len > 10.1, "{len}");
+    }
+
+    #[test]
+    fn closest_point_projects_onto_the_polyline() {
+        let mut c = straight(10.0);
+        let p = c.get_closest_point(Vector3::new(5.0, 3.0, 0.0));
+        assert!((p - Vector3::new(5.0, 0.0, 0.0)).length() < 1e-3, "{p:?}");
+        assert!((c.get_closest_offset(Vector3::new(5.0, 3.0, 0.0)) - 5.0).abs() < 1e-3);
+
+        assert!((c.get_closest_point(Vector3::new(20.0, 0.0, 0.0)) - Vector3::new(10.0, 0.0, 0.0)).length() < 1e-3);
+        assert!((c.get_closest_offset(Vector3::new(20.0, 0.0, 0.0)) - 10.0).abs() < 1e-3);
+        assert!(c.get_closest_point(Vector3::new(-5.0, 0.0, 0.0)).length() < 1e-3);
+        assert!(c.get_closest_offset(Vector3::new(-5.0, 0.0, 0.0)).abs() < 1e-3);
+    }
+
+    #[test]
+    fn closest_point_respects_depth() {
+        let mut c = Curve3D::new();
+        c.add_point(Vector3::ZERO);
+        c.add_point(Vector3::new(0.0, 0.0, 10.0));
+        let p = c.get_closest_point(Vector3::new(2.0, 0.0, 4.0));
+        assert!((p - Vector3::new(0.0, 0.0, 4.0)).length() < 1e-3, "{p:?}");
+        assert!((c.get_closest_offset(Vector3::new(2.0, 0.0, 4.0)) - 4.0).abs() < 1e-3);
     }
 
     #[test]
