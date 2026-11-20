@@ -1,6 +1,7 @@
 //! `core/io/`: data formats.
 
 pub mod config_file;
+pub mod ip_address;
 pub mod json;
 pub mod logger;
 pub mod json_native;
