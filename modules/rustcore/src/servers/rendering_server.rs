@@ -76,11 +76,18 @@ impl Default for TextureState {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct MaterialState {
+    pub shading_mode: i32,
+    pub params: std::collections::HashMap<crate::string::string_name::StringName, crate::variant::Variant>,
+}
+
 #[derive(Default)]
 pub struct RenderingServerData {
     canvas_items: RidOwner<CanvasItemState>,
     viewports: RidOwner<ViewportState>,
     textures: RidOwner<TextureState>,
+    materials: RidOwner<MaterialState>,
 }
 
 impl RenderingServerData {
@@ -243,6 +250,51 @@ impl RenderingServerData {
     pub fn texture_count(&self) -> usize {
         self.textures.count()
     }
+
+    pub fn material_create(&mut self) -> Rid {
+        self.materials.alloc(MaterialState::default())
+    }
+
+    pub fn material_free(&mut self, material: Rid) -> bool {
+        self.materials.free(material)
+    }
+
+    pub fn material_get(&self, material: Rid) -> Option<&MaterialState> {
+        self.materials.get(material)
+    }
+
+    /// material_set_param; the engine stores the Variant as-is.
+    pub fn material_set_param(&mut self, material: Rid, name: &str, value: crate::variant::Variant) -> bool {
+        match self.materials.get_mut(material) {
+            Some(m) => {
+                m.params
+                    .insert(crate::string::string_name::StringName::new(name), value);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// material_get_param: None for a freed material or an absent key.
+    pub fn material_get_param(&self, material: Rid, name: &str) -> Option<crate::variant::Variant> {
+        self.materials
+            .get(material)
+            .and_then(|m| m.params.get(&crate::string::string_name::StringName::new(name)).cloned())
+    }
+
+    pub fn material_set_shading_mode(&mut self, material: Rid, mode: i32) -> bool {
+        match self.materials.get_mut(material) {
+            Some(m) => {
+                m.shading_mode = mode;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn material_count(&self) -> usize {
+        self.materials.count()
+    }
 }
 
 #[cfg(test)]
@@ -357,6 +409,44 @@ mod tests {
 
         assert!(rs.texture_set_flags(tex, 0b101));
         assert_eq!(rs.texture_get(tex).unwrap().flags, 0b101);
+    }
+
+    #[test]
+    fn material_params_and_shading_mode() {
+        use crate::string::gstring::GoString;
+        use crate::variant::Variant;
+
+        let mut rs = RenderingServerData::new();
+        let mat = rs.material_create();
+        assert_eq!(rs.material_get(mat).unwrap().shading_mode, 0);
+        assert_eq!(rs.material_get_param(mat, "albedo"), None);
+
+        assert!(rs.material_set_param(mat, "albedo", Variant::Color(crate::math::color::Color::new(1.0, 0.0, 0.0, 1.0))));
+        assert!(rs.material_set_param(mat, "roughness", Variant::Float(0.25)));
+        assert!(rs.material_set_param(mat, "name", Variant::String(GoString::from_str("mat"))));
+        assert!(rs.material_set_shading_mode(mat, 2));
+
+        assert_eq!(
+            rs.material_get_param(mat, "albedo"),
+            Some(Variant::Color(crate::math::color::Color::new(1.0, 0.0, 0.0, 1.0)))
+        );
+        assert_eq!(rs.material_get_param(mat, "roughness"), Some(Variant::Float(0.25)));
+        assert_eq!(rs.material_get(mat).unwrap().shading_mode, 2);
+
+        assert!(rs.material_free(mat));
+        assert_eq!(rs.material_get_param(mat, "roughness"), None);
+        assert!(!rs.material_set_param(mat, "x", Variant::Int(1)));
+    }
+
+    #[test]
+    fn materials_do_not_touch_other_owners() {
+        let mut rs = RenderingServerData::new();
+        let _ = rs.material_create();
+        let _ = rs.material_create();
+        assert_eq!(rs.material_count(), 2);
+        assert_eq!(rs.canvas_item_count(), 0);
+        assert_eq!(rs.viewport_count(), 0);
+        assert_eq!(rs.texture_count(), 0);
     }
 
     #[test]
