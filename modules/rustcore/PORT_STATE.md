@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **708 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **713 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -225,6 +225,8 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/shader.rs` | `scene/resources/shader.*` | Mode enum (6 modes + Max), code/include path, and indexed default textures where null at index 0 erases the parameter while other indices keep a null entry. Compilation/uniforms/RID not ported. **Non-differential** |
 | `scene/material.rs` | `scene/resources/material.*` (base + ShaderMaterial) | Next pass, render priority validated to -128..=127, shader handle and a parameter map where `Nil` erases; sorted parameter list. RenderingServer side not ported. **Non-differential** |
 | `scene/skeleton_profile.rs` | `scene/resources/skeleton_profile.*` | Group/bone metadata with resize retention, per-index accessors/defaults, find/has bone (empty name never found) and the read-only flag blocking mutations. **Non-differential** |
+| `scene/mesh_instance_3d.rs` | `scene/3d/mesh_instance_3d.*` | Mesh/skin handles, skeleton path, blend-shape tracks with name lookup and index validation, and per-surface override materials. **Non-differential** |
+| `scene/importer_mesh_instance_3d.rs` | `scene/3d/importer_mesh_instance_3d.*` | Importer mesh/skin/path, growing surface material list with negative rejection, layer mask, shadow setting and visibility range/fade. **Non-differential** |
 | `scene/mesh_library.rs` | `scene/resources/3d/mesh_library.*` | Sorted integer items with create/remove/clear, name/mesh/transform/shadow/preview/navigation data, shape pairs, last-unused id and find-by-name; engine defaults for missing items. **Non-differential** |
 | `scene/skin.rs` | `scene/resources/3d/skin.*` | Bind defaults (-1 bone, empty name, identity pose), count resize rejecting negatives, add_bind/add_named_bind, index-validated setters and engine-default reads, clear_binds. **Non-differential** |
 | `scene/immediate_mesh.rs` | `scene/resources/immediate_mesh.*` (capture) | Surface begin/end with the double-begin and empty-end rejections, attribute setters that back-fill existing vertices when first enabled, 2D/3D mixing rejection, per-surface primitive/material/attribute arrays and `clear_surfaces`. Packed buffers/format/AABB not ported. **Non-differential** |
