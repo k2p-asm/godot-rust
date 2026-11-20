@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1399 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1404 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -197,6 +197,7 @@ um_int64`/
 um_uint64`) | bases 2-36, INT64_MIN, u64::MAX; plus 
 um_float` (fixed decimals, zero trimming, `-0.0`, inf/nan, 16-decimal cap, half-to-even rounding). **Non-differential** (see note 3) |
 | `math/fieldwise.rs` | `core/math/math_fieldwise.cpp` | `fieldwise_assign` over 14 variant types (Vector2..Transform3D), type-mismatch and unknown-field no-ops. **Non-differential** (engine code is `#ifdef DEBUG_ENABLED`) |
+| `audio/effects_compressor.rs` | `servers/audio/effects/audio_effect_compressor.*` | The compressor: peak follower, dB attack/release envelope, smoothed ratio with its own attack/release coefficients, the gain computer (`-overdb * (ratio - 1) / ratio`), makeup gain, dry/wet mix and the gain-reduction meter with its decay. The sidechain bus lookup is not ported. Tests cover defaults/accessors, below-threshold transparency, over-threshold attenuation, makeup gain and mix blending. **Non-differential** |
 | `audio/effects_stereo_enhance.rs` | `servers/audio/effects/audio_effect_stereo_enhance.*` | Pan pull-out towards the centre, the delayed right channel, the surround mode adding/subtracting the delayed mid, and the engine's next-power-of-two ring sizing from `MAX_DELAY_MS + 2`. Tests cover defaults, ring sizes, full-pullout identity, pull-out mixing, right-channel delay and surround. **Non-differential** |
 | `audio/effects_phaser.rs` | `servers/audio/effects/audio_effect_phaser.*` | The phaser: six-stage all-pass chain per channel (`a = (1-d)/(1+d)`), LFO sweep between `range_min`/`range_max` normalised by Nyquist, feedback tap and wet depth. Tests cover the all-pass maths, defaults/accessors, dry pass-through at zero depth/feedback, wet impulse colouring and LFO phase wrapping. **Non-differential** |
 | `audio/effects_chorus.rs` | `servers/audio/effects/audio_effect_chorus.*` | The chorus: four voices (delay/rate/depth/level/cutoff/pan), dry/wet mix, the doubled power-of-two ring buffer, 256-frame chunking, 16.16 phase accumulators, per-voice one-pole filters, sine-LFO delay modulation with linear interpolation and the read-ahead guard. Tests cover defaults/accessors and voice guards, dry-only identity, single-voice echo placement, LFO movement against a fixed-delay run, and voice summing. **Non-differential** |
