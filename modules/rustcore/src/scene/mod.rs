@@ -41,6 +41,7 @@ pub mod spring_arm_3d;
 pub mod path_nodes;
 pub mod occluders;
 pub mod parallax_and_heightfield;
+pub mod ik_and_look_at;
 pub mod ray_cast;
 pub mod shape_cast;
 pub mod collision_shape;
