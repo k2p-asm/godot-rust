@@ -9,6 +9,7 @@
 //! `Signal`, `Dictionary`, `Array` and friends need the object system and are
 //! deliberately absent.
 
+pub mod compare;
 pub mod ops;
 pub mod serial;
 
