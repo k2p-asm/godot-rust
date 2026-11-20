@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **661 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **667 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -212,6 +212,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/panel_container.rs` | `scene/gui/panel_container.*` (layout) | Minimum `child + stylebox` and child cell `Rect2(offset, size - style_min)` with the child's flags via `Control::layout_in_cell`. Theme lookup not ported. **Non-differential** |
 | `scene/label_settings.rs` | `scene/resources/label_settings.*` | Line/paragraph spacing, font handle, size 16, colours, shadow defaults and the ordered stacked outline/shadow lists with the engine's add/move/remove/count/validation rules. Text layout not ported. **Non-differential** |
 | `scene/bone_map.rs` | `scene/resources/bone_map.*` | Profile revalidation (insert missing, drop unknown, null clears), mapping only existing profile bones, reverse lookup and count. **Non-differential** |
+| `scene/shader.rs` | `scene/resources/shader.*` | Mode enum (6 modes + Max), code/include path, and indexed default textures where null at index 0 erases the parameter while other indices keep a null entry. Compilation/uniforms/RID not ported. **Non-differential** |
 | `scene/material.rs` | `scene/resources/material.*` (base + ShaderMaterial) | Next pass, render priority validated to -128..=127, shader handle and a parameter map where `Nil` erases; sorted parameter list. RenderingServer side not ported. **Non-differential** |
 | `scene/skeleton_profile.rs` | `scene/resources/skeleton_profile.*` | Group/bone metadata with resize retention, per-index accessors/defaults, find/has bone (empty name never found) and the read-only flag blocking mutations. **Non-differential** |
 | `scene/mesh_library.rs` | `scene/resources/3d/mesh_library.*` | Sorted integer items with create/remove/clear, name/mesh/transform/shadow/preview/navigation data, shape pairs, last-unused id and find-by-name; engine defaults for missing items. **Non-differential** |
