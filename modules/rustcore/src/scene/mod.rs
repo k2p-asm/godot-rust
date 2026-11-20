@@ -23,6 +23,7 @@ pub mod gradient_texture;
 pub mod grid_container;
 pub mod gui_indicators;
 pub mod gui_misc;
+pub mod label_settings;
 pub mod light_2d;
 pub mod light_occluder_2d;
 pub mod line_2d;
