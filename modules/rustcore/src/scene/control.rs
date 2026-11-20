@@ -43,6 +43,14 @@ pub mod size_flags {
     pub const SHRINK_END: u32 = 8;
 }
 
+/// `Control::FocusMode`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FocusMode {
+    None,
+    Click,
+    All,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ControlData {
     /// `[left, top, right, bottom]`, in 0..1 of the parent.
@@ -54,6 +62,10 @@ pub struct ControlData {
     size_flags_horizontal: u32,
     size_flags_vertical: u32,
     stretch_ratio: f32,
+    focus_mode: FocusMode,
+    has_focus: bool,
+    /// Focus neighbours as [left, top, right, bottom] control ids.
+    focus_neighbors: [Option<u64>; 4],
 }
 
 impl Default for ControlData {
@@ -72,6 +84,9 @@ impl ControlData {
             size_flags_horizontal: size_flags::FILL,
             size_flags_vertical: size_flags::FILL,
             stretch_ratio: 1.0,
+            focus_mode: FocusMode::None,
+            has_focus: false,
+            focus_neighbors: [None; 4],
         }
     }
 
@@ -159,6 +174,47 @@ impl ControlData {
 
     pub fn get_size_flags_vertical(&self) -> u32 {
         self.size_flags_vertical
+    }
+
+    pub fn set_focus_mode(&mut self, mode: FocusMode) {
+        self.focus_mode = mode;
+        if mode == FocusMode::None {
+            self.has_focus = false;
+        }
+    }
+
+    pub fn get_focus_mode(&self) -> FocusMode {
+        self.focus_mode
+    }
+
+    /// grab_focus: only controls with a focus mode can take focus.
+    pub fn grab_focus(&mut self) -> bool {
+        if self.focus_mode == FocusMode::None {
+            return false;
+        }
+        self.has_focus = true;
+        true
+    }
+
+    pub fn release_focus(&mut self) {
+        self.has_focus = false;
+    }
+
+    pub fn has_focus(&self) -> bool {
+        self.has_focus
+    }
+
+    /// Sides are [left, top, right, bottom]; invalid sides are rejected.
+    pub fn set_focus_neighbor(&mut self, side: usize, neighbor: Option<u64>) -> bool {
+        if side >= 4 {
+            return false;
+        }
+        self.focus_neighbors[side] = neighbor;
+        true
+    }
+
+    pub fn get_focus_neighbor(&self, side: usize) -> Option<u64> {
+        self.focus_neighbors.get(side).copied().flatten()
     }
 
     pub fn set_stretch_ratio(&mut self, ratio: f32) {
@@ -406,6 +462,35 @@ mod tests {
         // Negative content minimums are clamped at zero.
         c.set_content_minimum_size(Vector2::new(-5.0, -5.0));
         assert_eq!(c.get_content_minimum_size(), Vector2::ZERO);
+    }
+
+    #[test]
+    fn focus_mode_and_neighbors() {
+        let mut c = ControlData::new();
+        assert_eq!(c.get_focus_mode(), FocusMode::None);
+        assert!(!c.has_focus());
+        // Without a focus mode, grabbing fails.
+        assert!(!c.grab_focus());
+        assert!(!c.has_focus());
+
+        c.set_focus_mode(FocusMode::Click);
+        assert!(c.grab_focus());
+        assert!(c.has_focus());
+        c.release_focus();
+        assert!(!c.has_focus());
+
+        // Clearing the mode also drops focus.
+        c.grab_focus();
+        c.set_focus_mode(FocusMode::None);
+        assert!(!c.has_focus());
+
+        // Neighbours: left, top, right, bottom.
+        assert!(c.set_focus_neighbor(2, Some(77)));
+        assert_eq!(c.get_focus_neighbor(2), Some(77));
+        assert_eq!(c.get_focus_neighbor(0), None);
+        assert!(!c.set_focus_neighbor(4, Some(1)));
+        assert!(c.set_focus_neighbor(2, None));
+        assert_eq!(c.get_focus_neighbor(2), None);
     }
 
     #[test]
