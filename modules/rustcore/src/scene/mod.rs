@@ -24,6 +24,8 @@ pub mod box_container;
 pub mod camera_3d;
 pub mod camera_attributes;
 pub mod canvas_item;
+pub mod compressed_texture;
+pub mod canvas_group;
 pub mod canvas_item_material;
 pub mod compositor;
 pub mod control;

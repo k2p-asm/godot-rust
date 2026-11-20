@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1425 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1431 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -197,6 +197,8 @@ um_int64`/
 um_uint64`) | bases 2-36, INT64_MIN, u64::MAX; plus 
 um_float` (fixed decimals, zero trimming, `-0.0`, inf/nan, 16-decimal cap, half-to-even rounding). **Non-differential** (see note 3) |
 | `math/fieldwise.rs` | `core/math/math_fieldwise.cpp` | `fieldwise_assign` over 14 variant types (Vector2..Transform3D), type-mismatch and unknown-field no-ops. **Non-differential** (engine code is `#ifdef DEBUG_ENABLED`) |
+| `scene/canvas_group.rs` | `scene/2d/canvas_group.*` (state) | Fit margin 10, clear margin 10, mipmaps off with the full accessor surface. Rendering/server group not ported. **Non-differential** |
+| `scene/compressed_texture.rs` | `scene/resources/compressed_texture.*` (state) | The `DataFormat`/`LayeredType` enums, `FORMAT_VERSION` and the `FORMAT_BIT_*` constants, and the 2D/layered/3D resources' path, size, format, layers/mipmaps, depth and texture RIDs. `load` remembers the path but needs the pending `Image` port, so it reports false; decoded sizes are fed through port helpers. **Non-differential** |
 | `scene/gui_foldable.rs` | `scene/gui/foldable_container.*` (state) | FoldableContainer's folded flag, title/language/text direction/alignment/overrun/title position, and FoldableGroup membership with the single-expanded rule (unfolding reports the previous container to fold) and `allow_folding_all`. Drawing/shaping not ported. **Non-differential** |
 | `scene/subviewport_container.rs` | `scene/gui/subviewport_container.*` (state) | `stretch`, `shrink` (clamped to at least 1) and `mouse_target` with the engine defaults. Viewport sizing/input propagation not ported. **Non-differential** |
 | `scene/code_edit.rs` | `scene/gui/code_edit.*`, `scene/gui/text_edit.*` (state) | Indent settings and auto-indent prefixes, auto brace completion with the five constructor pairs and the engine insertion/validation rules, string/comment delimiters with `line_only`, gutters (main/line numbers/fold plus add/remove/configure), line-number digits/padding, breakpoint/bookmark/executing-line/fold flags, code-region tags, code hint/completion flags, matching-braces (TextEdit default off), symbol lookup/tooltip flags and line-length guidelines. Editing/drawing/completion popups not ported. **Non-differential** |
