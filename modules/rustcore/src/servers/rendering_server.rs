@@ -55,6 +55,7 @@ pub struct CanvasItemState {
     pub z_index: i32,
     pub visible: bool,
     pub commands: Vec<CanvasCommand>,
+    pub parent: Option<Rid>,
 }
 
 impl Default for CanvasItemState {
@@ -66,6 +67,7 @@ impl Default for CanvasItemState {
             z_index: 0,
             visible: true,
             commands: Vec::new(),
+            parent: None,
         }
     }
 }
@@ -76,6 +78,7 @@ pub struct ViewportState {
     pub size: Vector2i,
     pub transparent_background: bool,
     pub active: bool,
+    pub canvas: Option<Rid>,
 }
 
 impl Default for ViewportState {
@@ -85,6 +88,7 @@ impl Default for ViewportState {
             size: Vector2i::ZERO,
             transparent_background: false,
             active: true,
+            canvas: None,
         }
     }
 }
@@ -135,6 +139,7 @@ pub struct RenderingServerData {
     textures: RidOwner<TextureState>,
     materials: RidOwner<MaterialState>,
     meshes: RidOwner<MeshState>,
+    canvases: RidOwner<()>,
 }
 
 impl RenderingServerData {
@@ -475,6 +480,69 @@ impl RenderingServerData {
     pub fn mesh_count(&self) -> usize {
         self.meshes.count()
     }
+
+    pub fn canvas_create(&mut self) -> Rid {
+        self.canvases.alloc(())
+    }
+
+    pub fn canvas_free(&mut self, canvas: Rid) -> bool {
+        self.canvases.free(canvas)
+    }
+
+    pub fn canvas_count(&self) -> usize {
+        self.canvases.count()
+    }
+
+    /// iewport_attach_canvas; passing an invalid RID detaches.
+    pub fn viewport_attach_canvas(&mut self, viewport: Rid, canvas: Rid) -> bool {
+        if canvas.is_valid() && !self.canvases.is_valid(canvas) {
+            return false;
+        }
+        match self.viewports.get_mut(viewport) {
+            Some(v) => {
+                v.canvas = if canvas.is_valid() { Some(canvas) } else { None };
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// canvas_item_set_parent. An invalid parent detaches the item. Cycles and
+    /// self-parenting are rejected so the hierarchy stays a forest.
+    pub fn canvas_item_set_parent(&mut self, item: Rid, parent: Rid) -> bool {
+        if !self.canvas_items.is_valid(item) {
+            return false;
+        }
+        if parent.is_valid() {
+            if parent == item || !self.canvas_items.is_valid(parent) {
+                return false;
+            }
+            // Walk up from the prospective parent; reaching item would close a cycle.
+            let mut cursor = Some(parent);
+            let mut guard = 0;
+            while let Some(c) = cursor {
+                if c == item {
+                    return false;
+                }
+                cursor = self.canvas_items.get(c).and_then(|s| s.parent);
+                guard += 1;
+                if guard > 4096 {
+                    return false;
+                }
+            }
+        }
+        match self.canvas_items.get_mut(item) {
+            Some(s) => {
+                s.parent = if parent.is_valid() { Some(parent) } else { None };
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn canvas_item_get_parent(&self, item: Rid) -> Option<Option<Rid>> {
+        self.canvas_items.get(item).map(|s| s.parent)
+    }
 }
 
 #[cfg(test)]
@@ -616,6 +684,63 @@ mod tests {
         assert!(rs.material_free(mat));
         assert_eq!(rs.material_get_param(mat, "roughness"), None);
         assert!(!rs.material_set_param(mat, "x", Variant::Int(1)));
+    }
+
+    #[test]
+    fn canvas_hierarchy_and_viewport_attach() {
+        let mut rs = RenderingServerData::new();
+        let canvas = rs.canvas_create();
+        let vp = rs.viewport_create();
+        assert!(rs.viewport_attach_canvas(vp, canvas));
+        assert_eq!(rs.viewport_get(vp).unwrap().canvas, Some(canvas));
+
+        let root = rs.canvas_item_create();
+        let child = rs.canvas_item_create();
+        assert!(rs.canvas_item_set_parent(child, root));
+        assert_eq!(rs.canvas_item_get_parent(child), Some(Some(root)));
+        assert_eq!(rs.canvas_item_get_parent(root), Some(None));
+
+        // Detach with an invalid RID.
+        assert!(rs.canvas_item_set_parent(child, Rid::INVALID));
+        assert_eq!(rs.canvas_item_get_parent(child), Some(None));
+    }
+
+    #[test]
+    fn hierarchy_rejects_cycles_and_missing_handles() {
+        let mut rs = RenderingServerData::new();
+        let a = rs.canvas_item_create();
+        let b = rs.canvas_item_create();
+        let c = rs.canvas_item_create();
+
+        assert!(rs.canvas_item_set_parent(b, a));
+        assert!(rs.canvas_item_set_parent(c, b));
+
+        // c -> b -> a; making a a child of c would close a cycle.
+        assert!(!rs.canvas_item_set_parent(a, c));
+        // Self-parenting too.
+        assert!(!rs.canvas_item_set_parent(a, a));
+        // Dead parent.
+        let dead = rs.canvas_item_create();
+        assert!(rs.canvas_item_free(dead));
+        assert!(!rs.canvas_item_set_parent(a, dead));
+
+        // Invalid target item.
+        assert!(!rs.canvas_item_set_parent(dead, a));
+    }
+
+    #[test]
+    fn detaching_a_canvas_from_a_viewport() {
+        let mut rs = RenderingServerData::new();
+        let vp = rs.viewport_create();
+        let canvas = rs.canvas_create();
+        assert!(rs.viewport_attach_canvas(vp, canvas));
+        assert!(rs.viewport_attach_canvas(vp, Rid::INVALID));
+        assert_eq!(rs.viewport_get(vp).unwrap().canvas, None);
+
+        // Attaching a canvas that does not exist is rejected.
+        let freed = rs.canvas_create();
+        assert!(rs.canvas_free(freed));
+        assert!(!rs.viewport_attach_canvas(vp, freed));
     }
 
     #[test]
