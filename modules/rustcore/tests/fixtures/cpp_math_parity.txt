@@ -181,6 +181,8 @@ t2.origin,1,-2
 t2.interp,1.30788064,0.507127523
 t2.rs_skew0,1.7551651,0.958851099
 t2.rs_skew1,-2.72655511,2.92675543
+t2.rot_scale0,3.30134249,2.25856996
+t2.rot_scale1,-1.12928498,1.65067124
 ri.center,3,3
 ri.inter_pos,1,2
 ri.inter_size,1,2

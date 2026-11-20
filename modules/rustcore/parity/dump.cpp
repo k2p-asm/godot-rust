@@ -337,6 +337,10 @@ int main() {
 		t2_rs.set_rotation_scale_and_skew(0.5f, Size2(2.0f, 4.0f), 0.25f);
 		out("t2.rs_skew0", t2_rs.columns[0]);
 		out("t2.rs_skew1", t2_rs.columns[1]);
+		Transform2D t2_rsc;
+		t2_rsc.set_rotation_and_scale(0.6f, Size2(4.0f, 2.0f));
+		out("t2.rot_scale0", t2_rsc.columns[0]);
+		out("t2.rot_scale1", t2_rsc.columns[1]);
 	}
 
 	// --- Rect2i

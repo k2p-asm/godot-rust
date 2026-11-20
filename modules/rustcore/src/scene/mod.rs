@@ -4,4 +4,5 @@
 //! those nodes own, so they can be verified before the object layer exists.
 
 pub mod canvas_item;
+pub mod canvas_layer;
 pub mod node_2d;

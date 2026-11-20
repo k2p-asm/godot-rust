@@ -703,6 +703,11 @@ fn transform2d_matches_cpp() {
     t2_rs.set_rotation_scale_and_skew(0.5, Vector2::new(2.0, 4.0), 0.25);
     check(&m, "t2.rs_skew0", &v2(t2_rs.columns[0]), F32_TOL);
     check(&m, "t2.rs_skew1", &v2(t2_rs.columns[1]), F32_TOL);
+
+    let mut t2_rsc = Transform2D::IDENTITY;
+    t2_rsc.set_rotation_and_scale(0.6, Vector2::new(4.0, 2.0));
+    check(&m, "t2.rot_scale0", &v2(t2_rsc.columns[0]), F32_TOL);
+    check(&m, "t2.rot_scale1", &v2(t2_rsc.columns[1]), F32_TOL);
 }
 
 // ---------------------------------------------------------------------------

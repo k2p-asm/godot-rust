@@ -188,6 +188,14 @@ impl Transform2D {
         self.set_scale(scale);
     }
 
+    /// `set_rotation_and_scale`: no skew, used by `CanvasLayer`.
+    #[inline]
+    pub fn set_rotation_and_scale(&mut self, rot: f32, scale: Vector2) {
+        let (s, c) = (rot.sin(), rot.cos());
+        self.columns[0] = Vector2::new(c * scale.x, s * scale.x);
+        self.columns[1] = Vector2::new(-s * scale.y, c * scale.y);
+    }
+
     /// `set_rotation_scale_and_skew`: the transform `Node2D` rebuilds whenever
     /// one of its components changes.
     #[inline]
