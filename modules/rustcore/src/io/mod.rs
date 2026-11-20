@@ -2,6 +2,7 @@
 
 pub mod config_file;
 pub mod json;
+pub mod logger;
 pub mod json_native;
 pub mod path_utils;
 pub mod resource_uid;

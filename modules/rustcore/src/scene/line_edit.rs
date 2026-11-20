@@ -94,6 +94,7 @@ pub struct LineEditData {
     structured_text_parser: i32,
     structured_text_options: Vec<Variant>,
     draw_control_chars: bool,
+    select_all_on_focus: bool,
     language: String,
     right_icon: Option<Rid>,
     flat: bool,
@@ -141,6 +142,7 @@ impl LineEditData {
             structured_text_parser: 0,
             structured_text_options: Vec::new(),
             draw_control_chars: false,
+            select_all_on_focus: false,
             language: String::new(),
             right_icon: None,
             flat: false,
@@ -461,6 +463,15 @@ impl LineEditData {
 
     pub fn get_structured_text_bidi_override_options(&self) -> &[Variant] {
         &self.structured_text_options
+    }
+
+    /// set_select_all_on_focus (used by SpinBox).
+    pub fn set_select_all_on_focus(&mut self, enabled: bool) {
+        self.select_all_on_focus = enabled;
+    }
+
+    pub fn is_select_all_on_focus(&self) -> bool {
+        self.select_all_on_focus
     }
 
     pub fn set_language(&mut self, language: &str) {
