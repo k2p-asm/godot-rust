@@ -2,6 +2,7 @@
 
 pub mod config_file;
 pub mod dir_access;
+pub mod file_access_pack;
 pub mod file_access_helpers;
 pub mod file_access_memory;
 pub mod ip_address;
