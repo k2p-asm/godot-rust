@@ -35,6 +35,7 @@ pub mod texture_rect;
 pub mod touch_button;
 pub mod soft_body_3d;
 pub mod vehicle_nodes;
+pub mod curve_texture;
 pub mod decal_fog;
 pub mod joints_2d;
 pub mod physics_body_exceptions;
