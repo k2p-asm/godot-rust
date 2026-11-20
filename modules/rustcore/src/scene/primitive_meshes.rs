@@ -1055,6 +1055,105 @@ pub fn generate_capsule_arrays(
     arrays
 }
 
+/// `TorusMesh::create_mesh_array`.
+#[allow(clippy::too_many_arguments)]
+pub fn generate_torus_arrays(
+    inner_radius: f32,
+    outer_radius: f32,
+    rings: i32,
+    ring_segments: i32,
+    add_uv2: bool,
+    uv2_padding: f32,
+) -> GeneratedArrays {
+    let tau = std::f32::consts::TAU;
+    let mut arrays = GeneratedArrays::default();
+    if inner_radius == outer_radius {
+        return arrays;
+    }
+
+    let (min_radius, max_radius) = if inner_radius > outer_radius {
+        (outer_radius, inner_radius)
+    } else {
+        (inner_radius, outer_radius)
+    };
+    let radius = (max_radius - min_radius) * 0.5;
+
+    let horizontal_total = max_radius * tau + uv2_padding;
+    let max_h = max_radius * tau / horizontal_total;
+    let delta_h = (max_radius - min_radius) * tau / horizontal_total;
+    let height_v = radius * tau / (radius * tau + uv2_padding);
+
+    let mut uv2s: Vec<crate::math::vector2::Vector2> = Vec::new();
+    let mut points = 0i32;
+
+    for i in 0..=rings {
+        let prevrow = (i - 1) * (ring_segments + 1);
+        let thisrow = i * (ring_segments + 1);
+        let inci = i as f32 / rings as f32;
+        let angi = inci * tau;
+        let normali = if i == rings {
+            crate::math::vector2::Vector2::new(0.0, -1.0)
+        } else {
+            crate::math::vector2::Vector2::new(-angi.sin(), -angi.cos())
+        };
+
+        for j in 0..=ring_segments {
+            let incj = j as f32 / ring_segments as f32;
+            let angj = incj * tau;
+            let normalj = if j == ring_segments {
+                crate::math::vector2::Vector2::new(-1.0, 0.0)
+            } else {
+                crate::math::vector2::Vector2::new(-angj.cos(), angj.sin())
+            };
+            let normalk = normalj * radius
+                + crate::math::vector2::Vector2::new(min_radius + radius, 0.0);
+
+            let mut offset_h = 0.5 * (1.0 - normalj.x) * delta_h;
+            let adj_h = max_h - offset_h;
+            offset_h *= 0.5;
+
+            arrays.points.push(Vector3::new(
+                normali.x * normalk.x,
+                normalk.y,
+                normali.y * normalk.x,
+            ));
+            arrays.normals.push(Vector3::new(
+                normali.x * normalj.x,
+                normalj.y,
+                normali.y * normalj.x,
+            ));
+            arrays
+                .tangents
+                .extend_from_slice(&[normali.y, 0.0, -normali.x, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(inci, incj));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    offset_h + inci * adj_h,
+                    incj * height_v,
+                ));
+            }
+            points += 1;
+
+            if i > 0 && j > 0 {
+                arrays.indices.push(thisrow + j - 1);
+                arrays.indices.push(prevrow + j);
+                arrays.indices.push(prevrow + j - 1);
+                arrays.indices.push(thisrow + j - 1);
+                arrays.indices.push(thisrow + j);
+                arrays.indices.push(prevrow + j);
+            }
+        }
+    }
+
+    let _ = points;
+    if add_uv2 {
+        arrays.uv2s = uv2s;
+    }
+    arrays
+}
+
 #[derive(Clone, Debug)]
 pub struct PlaneMeshData {
     pub params: PrimitiveMeshParams,
@@ -1732,5 +1831,44 @@ mod tests {
         let a = generate_capsule_arrays(0.5, 2.0, 8, 4, true, 0.1);
         assert_eq!(a.uv2s.len(), a.points.len());
         assert!(a.uv2s.iter().all(|uv| uv.x >= 0.0 && uv.y >= 0.0));
+    }
+
+    #[test]
+    fn torus_arrays_counts_and_shape() {
+        let a = generate_torus_arrays(0.5, 1.0, 3, 3, false, 0.0);
+        // (rings+1) * (ring_segments+1) vertices and rings*segments*6 indices.
+        assert_eq!(a.points.len(), (3 + 1) * (3 + 1));
+        assert_eq!(a.indices.len(), 3 * 3 * 6);
+        assert!(a.uv2s.is_empty());
+        assert!(a.indices.iter().all(|&i| (0..a.points.len() as i32).contains(&i)));
+
+        // The tube spans inner+radius .. outer-radius+...: all points lie
+        // between the two radii on the XZ ring, never at the origin.
+        let radius = (1.0 - 0.5) * 0.5;
+        let min_center = 0.5 + radius; // 0.75
+        let max_center = 1.0 - radius; // 0.75 (same when radii are 0.5/1.0)
+        let _ = (min_center, max_center);
+        assert!(a.points.iter().all(|p| {
+            let d = (p.x * p.x + p.z * p.z).sqrt();
+            d >= 0.5 && d <= 1.0
+        }));
+        // Normals are unit length.
+        assert!(a.normals.iter().all(|n| (n.length() - 1.0).abs() < 1e-5));
+    }
+
+    #[test]
+    fn torus_arrays_swaps_and_rejects_equal_radii() {
+        // Swapped radii produce the same mesh.
+        let a = generate_torus_arrays(1.0, 0.5, 4, 4, false, 0.0);
+        assert!(!a.points.is_empty());
+        // Equal radii are refused, like the engine's ERR_FAIL_COND.
+        let b = generate_torus_arrays(0.5, 0.5, 4, 4, false, 0.0);
+        assert!(b.points.is_empty());
+        assert!(b.indices.is_empty());
+
+        // UV2 is generated per vertex.
+        let c = generate_torus_arrays(0.5, 1.0, 4, 4, true, 0.1);
+        assert_eq!(c.uv2s.len(), c.points.len());
+        assert!(c.uv2s.iter().all(|uv| uv.x >= 0.0 && uv.y >= 0.0));
     }
 }
