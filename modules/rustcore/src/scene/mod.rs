@@ -68,6 +68,7 @@ pub mod panel_container;
 pub mod parallax_2d;
 pub mod parallax_layer;
 pub mod particles_2d;
+pub mod particles_3d;
 pub mod path_2d;
 pub mod sprite_2d;
 pub mod sprite_frames;

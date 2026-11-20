@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **754 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **758 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -170,6 +170,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/color_names.rs` | `core/math/color_names.inc` | 146 `(NAME, 0xRRGGBBAA)` pairs from `tools/gen_color_names.py`, cross-checked with an independent C++ parser |
 | `string/gstring.rs` | `core/string/ustring.h/.cpp` (start) | COW buffer (`Arc::make_mut`), append/find/rfind/substr/begins_with/ends_with/strip_edges/split/replace/count/join/to_int/is_valid_int/to_float/is_valid_float/insert/repeat/find_char/pad_decimals/pad_zeros/lpad/rpad/trim_prefix/trim_suffix/quote/unquote/is_quoted/is_lowercase/is_uppercase/path helpers (get_file, get_extension, get_basename, path_join, is_absolute_path), ASCII + Unicode case mapping (`to_upper`/`to_lower`, locale-independent, non-differential), Murmur3 `hash()`. UTF-8/UTF-16 encode/decode with surrogate and U+10FFFF boundary tests (not differential: `ustring.cpp` cannot be linked in the harness). `String::num` pending |
 | `object/mod.rs` | `core/object/object.h`, `ref_counted.*` | `ObjectId` (unique, never reused, `is_valid`), `Object` lifetime registry, `RefCounted` ref/unref that destroys at zero. **Non-differential** |
+| `scene/particles_3d.rs` | `scene/3d/gpu_particles_3d.*` (state) | GPUParticles3D constructor defaults (amount 8, lifetime 1, **fixed FPS 30**, AABB `(-4,-4,-4)+(8,8,8)`, index draw order, collision size 0.01), draw-pass list with index checks, transform-align mode/channel/axis, trails and the same amount/lifetime/trail bounds; `interp_to_end` clamps `0..=1`. Rendering/RID not ported. **Non-differential** |
 | `scene/shapes_3d.rs` | `scene/resources/3d/*_shape_3d.*` (state) | Box `(1,1,1)`, sphere/cylinder radius 0.5, capsule 0.5/2 with the height↔radius coupling and `mid_height`, separation ray length 1, world boundary plane `(0,1,0,0)`, convex/concave polygons, and the heightmap's resize rules (sizes `< 1` ignored, data length must match `width*depth`). Physics server calls not ported. **Non-differential** |
 | `scene/particles_2d.rs` | `scene/2d/gpu_particles_2d.*` (state) | GPUParticles2D with the constructor's own defaults (emitting, amount 8, lifetime 1, fractional delta, visibility rect `(-100,-100,200,200)`), trails off (0.3 s, 8 sections, 4 subdivisions) and the engine's validation: `amount >= 1`, `lifetime > 0`, `trail_lifetime >= 0.01 - CMP_EPSILON`, sections `2..=128`, subdivisions `1..=1024`, while `amount_ratio` assigns unclamped. Rendering/RID/seed RNG not ported. **Non-differential** |
 | `io/resource_uid.rs` | `core/io/resource_uid.*` | Base-34 text form (`a`..`y`, `0`..`8`, `uid://` prefix, `<invalid>` sentinel, `0x7FFF…` mask) both directions, and the id→path table with add/set/remove/get refusal rules, `uid_to_path`, `ensure_path` and `create_id` retrying on collisions with an injected random source. On-disk cache, reverse cache and the MD5-seeded `create_id_for_path` not ported. **Non-differential** |

@@ -421,6 +421,13 @@ mod tests {
         p.set_fractional_delta(false);
         p.set_interpolate(false);
         p.set_interp_to_end_factor(0.5);
+        assert_eq!(p.get_interp_to_end_factor(), 0.5);
+        // The setter clamps rather than rejecting.
+        p.set_interp_to_end_factor(2.0);
+        assert_eq!(p.get_interp_to_end_factor(), 1.0);
+        p.set_interp_to_end_factor(-2.0);
+        assert_eq!(p.get_interp_to_end_factor(), 0.0);
+        p.set_interp_to_end_factor(0.5);
         p.set_seed(0xDEAD_BEEF);
         p.set_use_fixed_seed(true);
         p.set_draw_order(DrawOrder::ReverseLifetime);
