@@ -148,6 +148,7 @@ pub mod scroll_bar;
 pub mod reflection_probe;
 pub mod remote_transform_3d;
 pub mod retarget_modifier_3d;
+pub mod resource_3d_small;
 pub mod resource_extras;
 pub mod scene_tree;
 pub mod shader;
