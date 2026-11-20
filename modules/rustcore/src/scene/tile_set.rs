@@ -21,10 +21,24 @@ pub enum TileShape {
     Hexagon,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TileLayout {
+    Stacked,
+    StackedOffset,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TileOffsetAxis {
+    Horizontal,
+    Vertical,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct TileSetData {
     tile_size: Vector2i,
     tile_shape: TileShape,
+    tile_layout: TileLayout,
+    tile_offset_axis: TileOffsetAxis,
 }
 
 impl Default for TileSetData {
@@ -38,6 +52,8 @@ impl TileSetData {
         Self {
             tile_size: Vector2i::new(16, 16),
             tile_shape: TileShape::Square,
+            tile_layout: TileLayout::Stacked,
+            tile_offset_axis: TileOffsetAxis::Horizontal,
         }
     }
 
@@ -57,15 +73,78 @@ impl TileSetData {
         self.tile_shape
     }
 
+    pub fn set_tile_layout(&mut self, layout: TileLayout) {
+        self.tile_layout = layout;
+    }
+
+    pub fn get_tile_layout(&self) -> TileLayout {
+        self.tile_layout
+    }
+
+    pub fn set_tile_offset_axis(&mut self, axis: TileOffsetAxis) {
+        self.tile_offset_axis = axis;
+    }
+
+    pub fn get_tile_offset_axis(&self) -> TileOffsetAxis {
+        self.tile_offset_axis
+    }
+
     /// Cell center in local coordinates.
+    ///
+    /// Square cells ignore layout. For the half-offset shapes this implements
+    /// the engine's `STACKED` / `STACKED_OFFSET` branches and the overlap ratio
+    /// (0.5 isometric, 0.75 hexagon); `STAIRS_*` and `DIAMOND_*` are not
+    /// ported and return `None`.
     pub fn map_to_local(&self, cell: Vector2i) -> Option<Vector2> {
-        if self.tile_shape != TileShape::Square {
-            return None;
+        let mut ret = Vector2::new(cell.x as f32, cell.y as f32);
+
+        match self.tile_shape {
+            TileShape::Square => {}
+            TileShape::HalfOffsetSquare | TileShape::Hexagon | TileShape::Isometric => {
+                let odd = |v: i32| v.rem_euclid(2) != 0;
+                let even = |v: i32| v.rem_euclid(2) == 0;
+                match self.tile_offset_axis {
+                    TileOffsetAxis::Horizontal => match self.tile_layout {
+                        TileLayout::Stacked => {
+                            if odd(cell.y) {
+                                ret.x += 0.5;
+                            }
+                        }
+                        TileLayout::StackedOffset => {
+                            if even(cell.y) {
+                                ret.x += 0.5;
+                            }
+                        }
+                    },
+                    TileOffsetAxis::Vertical => match self.tile_layout {
+                        TileLayout::Stacked => {
+                            if odd(cell.x) {
+                                ret.y += 0.5;
+                            }
+                        }
+                        TileLayout::StackedOffset => {
+                            if even(cell.x) {
+                                ret.y += 0.5;
+                            }
+                        }
+                    },
+                }
+
+                let ratio = match (self.tile_offset_axis, self.tile_shape) {
+                    (TileOffsetAxis::Horizontal, TileShape::Isometric) => 0.5,
+                    (TileOffsetAxis::Horizontal, TileShape::Hexagon) => 0.75,
+                    (TileOffsetAxis::Vertical, TileShape::Isometric) => 0.5,
+                    (TileOffsetAxis::Vertical, TileShape::Hexagon) => 0.75,
+                    _ => 1.0,
+                };
+                match self.tile_offset_axis {
+                    TileOffsetAxis::Horizontal => ret.y *= ratio,
+                    TileOffsetAxis::Vertical => ret.x *= ratio,
+                }
+            }
         }
-        Some(Vector2::new(
-            (cell.x as f32 + 0.5) * self.tile_size.x as f32,
-            (cell.y as f32 + 0.5) * self.tile_size.y as f32,
-        ))
+
+        Some((ret + Vector2::new(0.5, 0.5)) * Vector2::new(self.tile_size.x as f32, self.tile_size.y as f32))
     }
 
     /// Cell containing `local`, flooring like the engine's square path.
@@ -111,10 +190,31 @@ mod tests {
     }
 
     #[test]
-    fn non_square_shapes_are_rejected() {
+    fn isometric_stacked_offsets_odd_rows() {
         let mut t = TileSetData::new();
         t.set_tile_shape(TileShape::Isometric);
-        assert!(t.map_to_local(Vector2i::new(1, 1)).is_none());
+        // (1,1): odd row adds 0.5 to x, then y is halved.
+        assert_eq!(t.map_to_local(Vector2i::new(1, 1)), Some(Vector2::new(32.0, 16.0)));
+        // (0,0): even row, no shift.
+        assert_eq!(t.map_to_local(Vector2i::new(0, 0)), Some(Vector2::new(8.0, 8.0)));
+    }
+
+    #[test]
+    fn hexagon_vertical_stacked_offset_shifts_even_columns() {
+        let mut t = TileSetData::new();
+        t.set_tile_shape(TileShape::Hexagon);
+        t.set_tile_offset_axis(TileOffsetAxis::Vertical);
+        t.set_tile_layout(TileLayout::StackedOffset);
+        // (1,1): odd column, no shift; x scaled by 0.75.
+        assert_eq!(t.map_to_local(Vector2i::new(1, 1)), Some(Vector2::new(20.0, 24.0)));
+        // (0,0): even column, +0.5 y (the 0.5 goes in before the center offset).
+        assert_eq!(t.map_to_local(Vector2i::new(0, 0)), Some(Vector2::new(8.0, 16.0)));
+    }
+
+    #[test]
+    fn local_to_map_remains_square_only() {
+        let mut t = TileSetData::new();
+        t.set_tile_shape(TileShape::Isometric);
         assert!(t.local_to_map(Vector2::ONE).is_none());
     }
 }
