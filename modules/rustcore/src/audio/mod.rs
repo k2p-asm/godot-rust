@@ -13,6 +13,7 @@ pub mod eq_filter;
 pub mod effects_stereo_enhance;
 pub mod fft;
 pub mod filter_sw;
+pub mod pitch_shift;
 pub mod resampler;
 pub mod stream_generator;
 pub mod stream_wav;
