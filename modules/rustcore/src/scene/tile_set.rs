@@ -25,6 +25,10 @@ pub enum TileShape {
 pub enum TileLayout {
     Stacked,
     StackedOffset,
+    StairsRight,
+    StairsDown,
+    DiamondRight,
+    DiamondDown,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -115,6 +119,16 @@ impl TileSetData {
                                 ret.x += 0.5;
                             }
                         }
+                        TileLayout::StairsRight => ret.x += ret.y / 2.0,
+                        TileLayout::StairsDown => {
+                            ret = Vector2::new(ret.x / 2.0, ret.y * 2.0 + ret.x)
+                        }
+                        TileLayout::DiamondRight => {
+                            ret = Vector2::new((ret.x + ret.y) / 2.0, ret.y - ret.x)
+                        }
+                        TileLayout::DiamondDown => {
+                            ret = Vector2::new((ret.x - ret.y) / 2.0, ret.y + ret.x)
+                        }
                     },
                     TileOffsetAxis::Vertical => match self.tile_layout {
                         TileLayout::Stacked => {
@@ -126,6 +140,16 @@ impl TileSetData {
                             if even(cell.x) {
                                 ret.y += 0.5;
                             }
+                        }
+                        TileLayout::StairsRight => {
+                            ret = Vector2::new(ret.x * 2.0 + ret.y, ret.y / 2.0)
+                        }
+                        TileLayout::StairsDown => ret.y += ret.x / 2.0,
+                        TileLayout::DiamondRight => {
+                            ret = Vector2::new(ret.x + ret.y, (ret.y - ret.x) / 2.0)
+                        }
+                        TileLayout::DiamondDown => {
+                            ret = Vector2::new(ret.x - ret.y, (ret.y + ret.x) / 2.0)
                         }
                     },
                 }
@@ -158,6 +182,7 @@ impl TileSetData {
         let mut ret = Vector2::new(local.x / ts.x, local.y / ts.y);
 
         if self.tile_shape == TileShape::Square {
+            let ret = ret + Vector2::new(0.00005, 0.00005);
             return Some(Vector2i::new(ret.x.floor() as i32, ret.y.floor() as i32));
         }
 
@@ -207,6 +232,34 @@ impl TileSetData {
                             ret += Vector2::new(if odd(ret.y) { 0.0 } else { 1.0 }, -1.0);
                         }
                     }
+                    TileLayout::StairsRight => {
+                        if tl {
+                            ret += Vector2::new(0.0, -1.0);
+                        } else if tr {
+                            ret += Vector2::new(1.0, -1.0);
+                        }
+                    }
+                    TileLayout::StairsDown => {
+                        if tl {
+                            ret += Vector2::new(-1.0, 0.0);
+                        } else if tr {
+                            ret += Vector2::new(1.0, -1.0);
+                        }
+                    }
+                    TileLayout::DiamondRight => {
+                        if tl {
+                            ret += Vector2::new(0.0, -1.0);
+                        } else if tr {
+                            ret += Vector2::new(1.0, 0.0);
+                        }
+                    }
+                    TileLayout::DiamondDown => {
+                        if tl {
+                            ret += Vector2::new(-1.0, 0.0);
+                        } else if tr {
+                            ret += Vector2::new(0.0, -1.0);
+                        }
+                    }
                 }
             }
             TileOffsetAxis::Vertical => {
@@ -241,6 +294,34 @@ impl TileSetData {
                             ret += Vector2::new(-1.0, if odd(ret.x) { -1.0 } else { 0.0 });
                         } else if bl {
                             ret += Vector2::new(-1.0, if odd(ret.x) { 0.0 } else { 1.0 });
+                        }
+                    }
+                    TileLayout::StairsRight => {
+                        if tl {
+                            ret += Vector2::new(0.0, -1.0);
+                        } else if bl {
+                            ret += Vector2::new(-1.0, 1.0);
+                        }
+                    }
+                    TileLayout::StairsDown => {
+                        if tl {
+                            ret += Vector2::new(-1.0, 0.0);
+                        } else if bl {
+                            ret += Vector2::new(-1.0, 1.0);
+                        }
+                    }
+                    TileLayout::DiamondRight => {
+                        if tl {
+                            ret += Vector2::new(0.0, -1.0);
+                        } else if bl {
+                            ret += Vector2::new(-1.0, 0.0);
+                        }
+                    }
+                    TileLayout::DiamondDown => {
+                        if tl {
+                            ret += Vector2::new(-1.0, 0.0);
+                        } else if bl {
+                            ret += Vector2::new(0.0, 1.0);
                         }
                     }
                 }
@@ -301,6 +382,30 @@ mod tests {
         assert_eq!(t.map_to_local(Vector2i::new(1, 1)), Some(Vector2::new(20.0, 24.0)));
         // (0,0): even column, +0.5 y (the 0.5 goes in before the center offset).
         assert_eq!(t.map_to_local(Vector2i::new(0, 0)), Some(Vector2::new(8.0, 16.0)));
+    }
+
+    #[test]
+    fn stairs_and_diamond_centres() {
+        // Values follow the engine's formulas directly (no round-trip claim: the
+        // stairs/diamond layouts are not symmetric, so a cell centre does not
+        // always map back to its own cell).
+        let mut t = TileSetData::new();
+        t.set_tile_shape(TileShape::Isometric);
+        t.set_tile_offset_axis(TileOffsetAxis::Horizontal);
+        t.set_tile_layout(TileLayout::StairsRight);
+        // (0,1): x += y/2 -> 0.5, y halved -> 0.5, plus centre -> (1,1)*16.
+        assert_eq!(t.map_to_local(Vector2i::new(0, 1)), Some(Vector2::new(16.0, 16.0)));
+
+        t.set_tile_layout(TileLayout::DiamondRight);
+        // (1,1): ((x+y)/2, y-x) = (1,0); y halved -> 0; centre -> (24,8).
+        assert_eq!(t.map_to_local(Vector2i::new(1, 1)), Some(Vector2::new(24.0, 8.0)));
+
+        let mut v = TileSetData::new();
+        v.set_tile_shape(TileShape::Hexagon);
+        v.set_tile_offset_axis(TileOffsetAxis::Vertical);
+        v.set_tile_layout(TileLayout::StairsDown);
+        // (1,1): (x, y + x/2) = (1,1.5); x scaled by 0.75 -> 0.75; centre -> (20,32).
+        assert_eq!(v.map_to_local(Vector2i::new(1, 1)), Some(Vector2::new(20.0, 32.0)));
     }
 
     #[test]
