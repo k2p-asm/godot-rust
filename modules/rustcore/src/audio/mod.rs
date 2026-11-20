@@ -7,6 +7,7 @@ pub mod effects_delay;
 pub mod effects_filter;
 pub mod effects_hard_limiter;
 pub mod effects_phaser;
+pub mod effects_record;
 pub mod effects_reverb;
 pub mod effects_simple;
 pub mod effects_spectrum;
