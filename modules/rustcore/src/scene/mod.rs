@@ -65,6 +65,7 @@ pub mod collision_shape;
 pub mod popup_menu;
 pub mod physics_body_2d;
 pub mod flow_container;
+pub mod font_state;
 pub mod navigation_nodes_2d;
 pub mod physics_material;
 pub mod placeholder_textures;
