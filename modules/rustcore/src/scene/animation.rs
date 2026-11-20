@@ -78,12 +78,22 @@ pub struct BezierKey {
     pub out_handle: crate::math::vector2::Vector2,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct AudioKey {
+    pub time: f64,
+    /// Server-side handle for the stream; the resource itself is not ported.
+    pub stream: crate::servers::rid::Rid,
+    pub start_offset: f32,
+    pub end_offset: f32,
+}
+
 #[derive(Clone, Debug)]
 pub struct Track {
     pub track_type: TrackType,
     pub keys: Vec<TrackKey>,
     pub method_keys: Vec<MethodKey>,
     pub bezier_keys: Vec<BezierKey>,
+    pub audio_keys: Vec<AudioKey>,
     pub interpolation: InterpolationType,
     pub loop_wrap: bool,
     pub path: StringName,
@@ -149,6 +159,7 @@ impl Animation {
             keys: Vec::new(),
             method_keys: Vec::new(),
             bezier_keys: Vec::new(),
+            audio_keys: Vec::new(),
             interpolation: InterpolationType::Linear,
             loop_wrap: true,
             path: StringName::new(""),
@@ -634,6 +645,56 @@ impl Animation {
         Some(low_pos.y + (high_pos.y - low_pos.y) * c)
     }
 
+    pub fn audio_track_insert_key(
+        &mut self,
+        track: usize,
+        time: f64,
+        stream: crate::servers::rid::Rid,
+        start_offset: f32,
+        end_offset: f32,
+    ) -> Option<usize> {
+        let t = self.tracks.get_mut(track)?;
+        let key = AudioKey {
+            time,
+            stream,
+            start_offset,
+            end_offset,
+        };
+        if let Some(idx) = t.audio_keys.iter().position(|k| k.time == time) {
+            t.audio_keys[idx] = key;
+            return Some(idx);
+        }
+        t.audio_keys.push(key);
+        t.audio_keys.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
+        t.audio_keys.iter().position(|k| k.time == time)
+    }
+
+    pub fn audio_track_get_key_count(&self, track: usize) -> usize {
+        self.tracks
+            .get(track)
+            .map(|t| t.audio_keys.len())
+            .unwrap_or(0)
+    }
+
+    pub fn audio_track_get_key(&self, track: usize, key: usize) -> Option<AudioKey> {
+        self.tracks.get(track)?.audio_keys.get(key).copied()
+    }
+
+    pub fn audio_track_set_key_stream(
+        &mut self,
+        track: usize,
+        key: usize,
+        stream: crate::servers::rid::Rid,
+    ) -> bool {
+        match self.tracks.get_mut(track).and_then(|t| t.audio_keys.get_mut(key)) {
+            Some(k) => {
+                k.stream = stream;
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Numeric value type check used by the interpolator above.
     pub fn track_is_numeric(&self, track: usize) -> bool {
         match self.tracks.get(track) {
@@ -870,6 +931,37 @@ mod tests {
         // out_handle pulls the curve up: y at the half is 6.875, not 5.
         let mid = a.bezier_track_interpolate(t, 0.5).unwrap();
         assert!((mid - 6.875).abs() < 1e-2, "{mid}");
+    }
+
+    #[test]
+    fn audio_track_keys_store_stream_and_offsets() {
+        use crate::servers::rid::Rid;
+        let mut a = Animation::new();
+        let t = a.add_track(TrackType::Audio, -1);
+        let stream = Rid::from_u64(0xABCD);
+
+        assert_eq!(
+            a.audio_track_insert_key(t, 1.0, stream, 0.5, 2.5),
+            Some(0)
+        );
+        assert_eq!(
+            a.audio_track_insert_key(t, 0.0, Rid::INVALID, 0.0, 0.0),
+            Some(0)
+        );
+        assert_eq!(a.audio_track_get_key_count(t), 2);
+
+        let k = a.audio_track_get_key(t, 1).unwrap();
+        assert_eq!(k.time, 1.0);
+        assert_eq!(k.stream, stream);
+        assert_eq!(k.start_offset, 0.5);
+        assert_eq!(k.end_offset, 2.5);
+
+        // Replacing the stream keeps the key count.
+        let other = Rid::from_u64(0x1234);
+        assert!(a.audio_track_set_key_stream(t, 1, other));
+        assert_eq!(a.audio_track_get_key(t, 1).unwrap().stream, other);
+        assert!(!a.audio_track_set_key_stream(t, 9, other));
+        assert_eq!(a.audio_track_get_key_count(t), 2);
     }
 
     #[test]
