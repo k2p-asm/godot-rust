@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 use crate::input::input_event::{
     InputEventAction, InputEventKey, InputEventMouseButton, InputEventMouseMotion,
 };
+use crate::input::input_event_extra::{InputEventJoypadButton, InputEventJoypadMotion};
 
 pub const ALL_DEVICES: i32 = -1;
 pub const DEFAULT_DEADZONE: f32 = 0.2;
@@ -27,6 +28,8 @@ pub enum InputEventRef {
     MouseButton(InputEventMouseButton),
     MouseMotion(InputEventMouseMotion),
     Action(InputEventAction),
+    JoypadButton(InputEventJoypadButton),
+    JoypadMotion(InputEventJoypadMotion),
 }
 
 impl InputEventRef {
@@ -37,6 +40,8 @@ impl InputEventRef {
             (InputEventRef::MouseButton(a), InputEventRef::MouseButton(b)) => a.matches(b),
             (InputEventRef::MouseMotion(_), InputEventRef::MouseMotion(_)) => false,
             (InputEventRef::Action(a), InputEventRef::Action(b)) => a.matches(b),
+            (InputEventRef::JoypadButton(a), InputEventRef::JoypadButton(b)) => a.matches(b),
+            (InputEventRef::JoypadMotion(a), InputEventRef::JoypadMotion(b)) => a.matches(b),
             _ => false,
         }
     }
@@ -244,5 +249,41 @@ mod tests {
         assert_eq!(map.get_actions(), vec!["jump", "ui_left", "ui_right"]);
         map.clear();
         assert!(map.get_actions().is_empty());
+    }
+
+    #[test]
+    fn joypad_events_take_part_in_actions() {
+        use crate::input::input_event_extra::{InputEventJoypadButton, InputEventJoypadMotion};
+        use crate::input::input_event_extra::{JoyAxis, JoyButton};
+
+        let mut map = InputMapData::new();
+        map.add_action("jump", DEFAULT_DEADZONE);
+        map.add_action("move_right", DEFAULT_DEADZONE);
+
+        let mut button = InputEventJoypadButton::new();
+        button.set_button_index(JoyButton::A as i32);
+        let bound = InputEventRef::JoypadButton(button.clone());
+        assert!(map.action_add_event("jump", bound.clone()));
+        assert!(map.event_is_action(&bound, "jump"));
+
+        // The same button on another index does not match.
+        let mut other = button.clone();
+        other.set_button_index(JoyButton::B as i32);
+        assert!(!map.event_is_action(&InputEventRef::JoypadButton(other), "jump"));
+
+        // Axis bindings compare the axis and the direction sign.
+        let mut motion = InputEventJoypadMotion::new();
+        motion.set_axis(JoyAxis::LeftX as i32);
+        motion.set_axis_value(1.0);
+        let bound = InputEventRef::JoypadMotion(motion.clone());
+        assert!(map.action_add_event("move_right", bound.clone()));
+        assert!(map.event_is_action(&bound, "move_right"));
+
+        let mut opposite = motion.clone();
+        opposite.set_axis_value(-1.0);
+        assert!(!map.event_is_action(&InputEventRef::JoypadMotion(opposite), "move_right"));
+        let mut other_axis = motion.clone();
+        other_axis.set_axis(JoyAxis::LeftY as i32);
+        assert!(!map.event_is_action(&InputEventRef::JoypadMotion(other_axis), "move_right"));
     }
 }
