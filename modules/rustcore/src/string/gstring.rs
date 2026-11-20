@@ -482,6 +482,142 @@ impl GoString {
         }
     }
 
+    /// `trim_prefix`: removes `prefix` when the string starts with it.
+    pub fn trim_prefix(&self, prefix: &Self) -> Self {
+        if self.begins_with(prefix) {
+            self.substr(prefix.len(), -1)
+        } else {
+            self.clone()
+        }
+    }
+
+    /// `trim_suffix`: removes `suffix` when the string ends with it.
+    pub fn trim_suffix(&self, suffix: &Self) -> Self {
+        if self.ends_with(suffix) {
+            self.substr(0, self.len() as isize - suffix.len() as isize)
+        } else {
+            self.clone()
+        }
+    }
+
+    /// `is_enclosed_in`: both ends match `s`.
+    pub fn is_enclosed_in(&self, s: &Self) -> bool {
+        self.begins_with(s) && self.ends_with(s)
+    }
+
+    /// `is_quoted`: enclosed in `"` or `'`.
+    pub fn is_quoted(&self) -> bool {
+        self.is_enclosed_in(&Self::from_str("\"")) || self.is_enclosed_in(&Self::from_str("'"))
+    }
+
+    /// `quote`: wraps the string, without escaping anything.
+    pub fn quote(&self, quotechar: &Self) -> Self {
+        quotechar.concatenated(self).concatenated(quotechar)
+    }
+
+    /// `unquote`: strips one pair of quotes; a non-quoted string is unchanged.
+    pub fn unquote(&self) -> Self {
+        if !self.is_quoted() {
+            self.clone()
+        } else {
+            self.substr(1, self.len() as isize - 2)
+        }
+    }
+
+    /// `is_lowercase`: no uppercase letter anywhere (digits and punctuation are
+    /// neutral, like the engine's loop).
+    pub fn is_lowercase(&self) -> bool {
+        self.data.iter().all(|&c| !crate::string::char_utils::is_unicode_upper_case(c))
+    }
+
+    /// `is_uppercase`: no lowercase letter anywhere.
+    pub fn is_uppercase(&self) -> bool {
+        self.data.iter().all(|&c| !crate::string::char_utils::is_unicode_lower_case(c))
+    }
+
+    /// `find_char` from an index.
+    pub fn find_char_from(&self, c: char, from: usize) -> isize {
+        let needle = c as u32;
+        if from >= self.len() {
+            return -1;
+        }
+        match self.data[from..].iter().position(|&u| u == needle) {
+            Some(i) => (from + i) as isize,
+            None => -1,
+        }
+    }
+
+    /// `rfind_char`: last occurrence of `c`.
+    pub fn rfind_char(&self, c: char) -> isize {
+        let needle = c as u32;
+        match self.data.iter().rposition(|&u| u == needle) {
+            Some(i) => i as isize,
+            None => -1,
+        }
+    }
+
+    /// `is_absolute_path`: leading separator, or a `:/` / `:\` anywhere
+    /// (drive letter or URL scheme).
+    pub fn is_absolute_path(&self) -> bool {
+        match self.len() {
+            0 => false,
+            1 => self.data[0] == '/' as u32 || self.data[0] == '\\' as u32,
+            _ => {
+                self.data[0] == '/' as u32
+                    || self.data[0] == '\\' as u32
+                    || self.find(&Self::from_str(":/"), 0) != -1
+                    || self.find(&Self::from_str(":\\"), 0) != -1
+            }
+        }
+    }
+
+    pub fn is_relative_path(&self) -> bool {
+        !self.is_absolute_path()
+    }
+
+    /// `get_file`: everything after the last `/` or `\`.
+    pub fn get_file(&self) -> Self {
+        let sep = self.rfind_char('/').max(self.rfind_char('\\'));
+        if sep == -1 {
+            self.clone()
+        } else {
+            self.substr(sep as usize + 1, -1)
+        }
+    }
+
+    /// `get_extension`: text after the last dot, unless that dot is in a
+    /// directory name.
+    pub fn get_extension(&self) -> Self {
+        let pos = self.rfind_char('.');
+        if pos < 0 || pos < self.rfind_char('/').max(self.rfind_char('\\')) {
+            return Self::new();
+        }
+        self.substr(pos as usize + 1, -1)
+    }
+
+    /// `get_basename`: the string without its extension.
+    pub fn get_basename(&self) -> Self {
+        let pos = self.rfind_char('.');
+        if pos < 0 || pos < self.rfind_char('/').max(self.rfind_char('\\')) {
+            return self.clone();
+        }
+        self.substr(0, pos)
+    }
+
+    /// `path_join`: one separator, never doubled.
+    pub fn path_join(&self, file: &Self) -> Self {
+        if self.is_empty() {
+            return file.clone();
+        }
+        if self.data[self.len() - 1] == '/' as u32
+            || (!file.is_empty() && file.data[0] == '/' as u32)
+        {
+            self.concatenated(file)
+        } else {
+            self.concatenated(&Self::from_str("/")).concatenated(file)
+        }
+    }
+
     /// `String::hash()` -- MurmurHash3 over the UTF-32 units, little-endian.
     pub fn hash(&self) -> u32 {
         let mut bytes = Vec::with_capacity(self.data.len() * 4);
@@ -550,6 +686,80 @@ mod tests {
         // Negative counts give an empty repeat, never a panic.
         assert_eq!(s("").repeat(-3).as_string(), "");
         assert_eq!(s("ab").repeat(0).as_string(), "");
+    }
+
+    #[test]
+    fn prefix_suffix_and_quotes() {
+        assert_eq!(s("res://icon.png").trim_prefix(&s("res://")).as_string(), "icon.png");
+        // Only an exact prefix is removed.
+        assert_eq!(s("res:/icon.png").trim_prefix(&s("res://")).as_string(), "res:/icon.png");
+        // Empty prefix matches, and removes nothing.
+        assert_eq!(s("abc").trim_prefix(&s("")).as_string(), "abc");
+
+        assert_eq!(s("file.txt").trim_suffix(&s(".txt")).as_string(), "file");
+        assert_eq!(s("file.txt.bak").trim_suffix(&s(".txt")).as_string(), "file.txt.bak");
+        assert_eq!(s("abc").trim_suffix(&s("")).as_string(), "abc");
+
+        assert!(s("\"hello\"").is_quoted());
+        assert!(s("'hello'").is_quoted());
+        assert!(!s("\"hello'").is_quoted());
+        assert_eq!(s("\"hello\"").unquote().as_string(), "hello");
+        assert_eq!(s("'hello'").unquote().as_string(), "hello");
+        assert_eq!(s("hello").unquote().as_string(), "hello");
+        // A lone quote is quoted (starts and ends with it) and unquotes to "".
+        assert_eq!(s("\"").unquote().as_string(), "");
+
+        assert_eq!(s("ab").quote(&s("\"")).as_string(), "\"ab\"");
+        assert_eq!(s("ab").quote(&s("'")).as_string(), "'ab'");
+    }
+
+    #[test]
+    fn case_predicates() {
+        assert!(s("hello123").is_lowercase());
+        assert!(!s("Hello").is_lowercase());
+        assert!(s("HELLO 42!").is_uppercase());
+        assert!(!s("Hello").is_uppercase());
+        // No letters at all satisfies both, like the engine's empty loop.
+        assert!(s("123!").is_lowercase());
+        assert!(s("123!").is_uppercase());
+        assert!(s("").is_lowercase());
+        // Non-ASCII letters go through the Unicode tables.
+        assert!(!s("áéí").is_uppercase());
+        assert!(s("áéí").is_lowercase());
+        assert!(s("ÁÉÍ").is_uppercase());
+    }
+
+    #[test]
+    fn path_helpers() {
+        assert!(s("/abs").is_absolute_path());
+        assert!(s("C:/x").is_absolute_path());
+        assert!(s("C:\\x").is_absolute_path());
+        assert!(s("res://a.png").is_absolute_path());
+        assert!(s("\\").is_absolute_path());
+        assert!(!s("a/b").is_absolute_path());
+        assert!(!s("").is_absolute_path());
+        assert!(!s("C:").is_absolute_path());
+        assert!(s("a/b").is_relative_path());
+
+        assert_eq!(s("a/b/c.txt").get_file().as_string(), "c.txt");
+        assert_eq!(s("a\\b\\c.txt").get_file().as_string(), "c.txt");
+        assert_eq!(s("c.txt").get_file().as_string(), "c.txt");
+
+        assert_eq!(s("a/b/c.txt").get_extension().as_string(), "txt");
+        // A dot in a directory name is not an extension.
+        assert_eq!(s("a.b/c").get_extension().as_string(), "");
+        assert_eq!(s("c").get_extension().as_string(), "");
+        // Hidden files: the dot is at index 0, so it is treated as extension.
+        assert_eq!(s(".bashrc").get_extension().as_string(), "bashrc");
+
+        assert_eq!(s("a/b/c.txt").get_basename().as_string(), "a/b/c");
+        assert_eq!(s("a.b/c").get_basename().as_string(), "a.b/c");
+        assert_eq!(s("c").get_basename().as_string(), "c");
+
+        assert_eq!(s("a/b").path_join(&s("c.txt")).as_string(), "a/b/c.txt");
+        assert_eq!(s("a/b/").path_join(&s("c.txt")).as_string(), "a/b/c.txt");
+        assert_eq!(s("a/b").path_join(&s("/c.txt")).as_string(), "a/b/c.txt");
+        assert_eq!(s("").path_join(&s("c.txt")).as_string(), "c.txt");
     }
 
     #[test]
