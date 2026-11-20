@@ -20,6 +20,8 @@
 //! ported.
 
 use crate::math::aabb::Aabb;
+use crate::math::geometry_2d;
+use crate::math::vector2::Vector2;
 use crate::math::vector3::Vector3;
 use crate::servers::rid::Rid;
 
@@ -318,9 +320,14 @@ impl NavigationObstacle3DData {
     /// Stores the outline and refreshes the two derived flags.
     pub fn set_vertices(&mut self, vertices: Vec<Vector3>) {
         self.vertices = vertices;
-        let projected: Vec<(f32, f32)> = self.vertices.iter().map(|v| (v.x, v.z)).collect();
-        self.vertices_are_clockwise = !is_polygon_clockwise(&projected);
-        self.vertices_are_valid = self.vertices.len() >= 3;
+        let projected: Vec<Vector2> = self
+            .vertices
+            .iter()
+            .map(|v| Vector2::new(v.x, v.z))
+            .collect();
+        // Geometry2D is inverted relative to the obstacle's expectation.
+        self.vertices_are_clockwise = !geometry_2d::is_polygon_clockwise(&projected);
+        self.vertices_are_valid = !geometry_2d::triangulate_polygon(&projected).is_empty();
     }
 
     pub fn get_vertices(&self) -> &[Vector3] {
@@ -401,23 +408,6 @@ impl NavigationObstacle3DData {
     pub fn get_navigation_map(&self) -> Option<Rid> {
         self.navigation_map
     }
-}
-
-/// The shoelace sign over the `(x, z)` projection: positive for the winding the
-/// engine's `Geometry2D::is_polygon_clockwise` calls clockwise.
-fn is_polygon_clockwise(points: &[(f32, f32)]) -> bool {
-    if points.len() < 3 {
-        return false;
-    }
-    // Godot's own formulation: sum += (x2 - x1) * (y2 + y1), clockwise when
-    // the sum is positive (screen coordinates, y down).
-    let mut sum = 0.0f32;
-    for i in 0..points.len() {
-        let (x1, y1) = points[i];
-        let (x2, y2) = points[(i + 1) % points.len()];
-        sum += (x2 - x1) * (y2 + y1);
-    }
-    sum > 0.0
 }
 
 #[cfg(test)]

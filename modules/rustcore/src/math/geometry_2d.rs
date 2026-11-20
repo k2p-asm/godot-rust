@@ -197,9 +197,62 @@ pub fn bresenham_line(from: Vector2i, to: Vector2i) -> Vec<Vector2i> {
     points.push(current);
     points
 }
+/// `Geometry2D::is_polygon_clockwise`: Godot's winding sum, positive when the
+/// polygon is clockwise in screen coordinates (+y down).
+pub fn is_polygon_clockwise(polygon: &[Vector2]) -> bool {
+    if polygon.len() < 3 {
+        return false;
+    }
+    let mut sum = 0.0f32;
+    for i in 0..polygon.len() {
+        let v1 = polygon[i];
+        let v2 = polygon[(i + 1) % polygon.len()];
+        sum += (v2.x - v1.x) * (v2.y + v1.y);
+    }
+    sum > 0.0
+}
+
+/// `Geometry2D::triangulate_polygon`: ear-clipping through the ported
+/// `Triangulate`; an empty result means the polygon could not be triangulated.
+pub fn triangulate_polygon(polygon: &[Vector2]) -> Vec<i32> {
+    crate::math::triangulate::triangulate(polygon).unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clockwise_detection_matches_godot() {
+        // Screen coordinates: this square winds clockwise.
+        let cw = [
+            Vector2::new(0.0, 0.0),
+            Vector2::new(0.0, 4.0),
+            Vector2::new(4.0, 4.0),
+            Vector2::new(4.0, 0.0),
+        ];
+        assert!(is_polygon_clockwise(&cw));
+        let ccw: Vec<Vector2> = cw.iter().rev().copied().collect();
+        assert!(!is_polygon_clockwise(&ccw));
+        // Fewer than three points is never clockwise.
+        assert!(!is_polygon_clockwise(&[Vector2::ZERO]));
+    }
+
+    #[test]
+    fn polygon_triangulation() {
+        let quad = [
+            Vector2::new(0.0, 0.0),
+            Vector2::new(0.0, 4.0),
+            Vector2::new(4.0, 4.0),
+            Vector2::new(4.0, 0.0),
+        ];
+        let indices = triangulate_polygon(&quad);
+        assert_eq!(indices.len(), 6, "two triangles of three indices");
+        assert!(indices.iter().all(|&i| (0..4).contains(&i)));
+
+        // Degenerate input cannot be triangulated.
+        assert!(triangulate_polygon(&quad[..2]).is_empty());
+    }
 
     #[test]
     fn crossing_segments() {
