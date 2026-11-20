@@ -16,6 +16,7 @@
 //! linked into the parity harness.
 
 pub mod class_db;
+pub mod resource;
 
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};

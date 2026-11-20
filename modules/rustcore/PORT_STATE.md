@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **723 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **726 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -243,6 +243,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/parallax_2d.rs` | `scene/2d/parallax_2d.*` (state) | Scroll scale/offset, screen offset, repeat size (`maxf(0)`) and times (`>= 1`), ±10,000,000 limits, autoscroll, follow/ignore flags, group name. Camera-moved math not ported. **Non-differential** |
 | `scene/visible_on_screen_notifier_2d.rs` | `scene/2d/visible_on_screen_notifier_2d.*` (state) | Notifier rect/show-rect/on-screen hook and enabler enable modes with default `..` path. Server registration/signals not ported. **Non-differential** |
 | `servers/audio_effect_{reverb,delay,chorus,distortion,eq,filter,misc}.rs` | `servers/audio/effects/audio_effect_*.{h,cpp}` | Parameter state for every effect class: Reverb, Delay, Chorus, Distortion, EQ6/10/21, the five filters, Limiter, Amplify, Panner, StereoEnhance, Compressor and PitchShift. Defaults copied from each constructor or in-class initialiser; setters replicate the C++ validation (EQ band index, chorus voice index/count, pitch scale `> 0`, oversampling `>= 4`, FFT size `< MAX`, reverb feedback `0..0.98`) and never clamp where the engine does not. `Amplify` converts through `linear_to_db`/`db_to_linear`. DSP/`process()` is not ported. **Non-differential** (`AudioEffect` is `Resource`-backed) |
+| `servers/audio_capture.rs` | `servers/audio/effects/audio_effect_{capture,record}.*` | Capture ring sized by `nearest_shift(mix_rate * seconds)`, size-1 capacity, whole-block push/discard counters, validated exact reads; Record WAV format (16-bit default) and recording flag. IO thread/stream creation not ported. **Non-differential** |
 | `servers/audio_bus.rs` | `servers/audio/audio_bus_layout.*` (state) | Master bus that cannot be removed, add/remove with send reindexing, volume/mute/solo/bypass, validated send targets, and `is_bus_active` with the engine's solo rule. Mixing not ported. **Non-differential** |
 
 ## Deliberately not translated
