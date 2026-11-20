@@ -147,15 +147,107 @@ impl TileSetData {
         Some((ret + Vector2::new(0.5, 0.5)) * Vector2::new(self.tile_size.x as f32, self.tile_size.y as f32))
     }
 
-    /// Cell containing `local`, flooring like the engine's square path.
+    /// Cell containing `local`.
+    ///
+    /// Square cells floor directly. For the half-offset shapes this ports the
+    /// engine's "smart floor" plus the top/bottom triangle correction; only
+    /// `STACKED` / `STACKED_OFFSET` layouts are implemented, matching
+    /// `map_to_local`.
     pub fn local_to_map(&self, local: Vector2) -> Option<Vector2i> {
-        if self.tile_shape != TileShape::Square {
-            return None;
+        let ts = Vector2::new(self.tile_size.x as f32, self.tile_size.y as f32);
+        let mut ret = Vector2::new(local.x / ts.x, local.y / ts.y);
+
+        if self.tile_shape == TileShape::Square {
+            return Some(Vector2i::new(ret.x.floor() as i32, ret.y.floor() as i32));
         }
-        Some(Vector2i::new(
-            (local.x / self.tile_size.x as f32).floor() as i32,
-            (local.y / self.tile_size.y as f32).floor() as i32,
-        ))
+
+        let ratio = match (self.tile_offset_axis, self.tile_shape) {
+            (TileOffsetAxis::Horizontal, TileShape::Isometric) => 0.5,
+            (TileOffsetAxis::Horizontal, TileShape::Hexagon) => 0.75,
+            (TileOffsetAxis::Vertical, TileShape::Isometric) => 0.5,
+            (TileOffsetAxis::Vertical, TileShape::Hexagon) => 0.75,
+            _ => 1.0,
+        };
+
+        let odd = |v: f32| (v.floor() as i32).rem_euclid(2) != 0;
+        let stacked_offset = self.tile_layout == TileLayout::StackedOffset;
+
+        match self.tile_offset_axis {
+            TileOffsetAxis::Horizontal => {
+                ret.y /= ratio;
+                let raw = ret;
+                if odd(ret.y) != stacked_offset {
+                    ret = Vector2::new((ret.x + 0.5).floor() - 0.5, ret.y.floor());
+                } else {
+                    ret = Vector2::new(ret.x.floor(), ret.y.floor());
+                }
+
+                let in_tile = raw - ret;
+                let slope = 1.0 / ratio - 1.0;
+                let tl = (in_tile - Vector2::new(0.5, 0.0))
+                    .cross(Vector2::new(-0.5, slope))
+                    <= 0.0;
+                let tr = (in_tile - Vector2::new(0.5, 0.0))
+                    .cross(Vector2::new(0.5, slope))
+                    > 0.0;
+
+                ret = Vector2::new(ret.x.floor(), ret.y.floor());
+                match self.tile_layout {
+                    TileLayout::Stacked => {
+                        if tl {
+                            ret += Vector2::new(if odd(ret.y) { 0.0 } else { -1.0 }, -1.0);
+                        } else if tr {
+                            ret += Vector2::new(if odd(ret.y) { 1.0 } else { 0.0 }, -1.0);
+                        }
+                    }
+                    TileLayout::StackedOffset => {
+                        if tl {
+                            ret += Vector2::new(if odd(ret.y) { -1.0 } else { 0.0 }, -1.0);
+                        } else if tr {
+                            ret += Vector2::new(if odd(ret.y) { 0.0 } else { 1.0 }, -1.0);
+                        }
+                    }
+                }
+            }
+            TileOffsetAxis::Vertical => {
+                ret.x /= ratio;
+                let raw = ret;
+                if odd(ret.x) != stacked_offset {
+                    ret = Vector2::new(ret.x.floor(), (ret.y + 0.5).floor() - 0.5);
+                } else {
+                    ret = Vector2::new(ret.x.floor(), ret.y.floor());
+                }
+
+                let in_tile = raw - ret;
+                let slope = 1.0 / ratio - 1.0;
+                let tl = (in_tile - Vector2::new(0.0, 0.5))
+                    .cross(Vector2::new(slope, -0.5))
+                    > 0.0;
+                let bl = (in_tile - Vector2::new(0.0, 0.5))
+                    .cross(Vector2::new(slope, 0.5))
+                    <= 0.0;
+
+                ret = Vector2::new(ret.x.floor(), ret.y.floor());
+                match self.tile_layout {
+                    TileLayout::Stacked => {
+                        if tl {
+                            ret += Vector2::new(-1.0, if odd(ret.x) { 0.0 } else { -1.0 });
+                        } else if bl {
+                            ret += Vector2::new(-1.0, if odd(ret.x) { 1.0 } else { 0.0 });
+                        }
+                    }
+                    TileLayout::StackedOffset => {
+                        if tl {
+                            ret += Vector2::new(-1.0, if odd(ret.x) { -1.0 } else { 0.0 });
+                        } else if bl {
+                            ret += Vector2::new(-1.0, if odd(ret.x) { 0.0 } else { 1.0 });
+                        }
+                    }
+                }
+            }
+        }
+
+        Some(Vector2i::new(ret.x as i32, ret.y as i32))
     }
 }
 
@@ -212,9 +304,20 @@ mod tests {
     }
 
     #[test]
-    fn local_to_map_remains_square_only() {
-        let mut t = TileSetData::new();
-        t.set_tile_shape(TileShape::Isometric);
-        assert!(t.local_to_map(Vector2::ONE).is_none());
+    fn half_offset_round_trips_through_cell_centers() {
+        for shape in [TileShape::Isometric, TileShape::Hexagon, TileShape::HalfOffsetSquare] {
+            for axis in [TileOffsetAxis::Horizontal, TileOffsetAxis::Vertical] {
+                for layout in [TileLayout::Stacked, TileLayout::StackedOffset] {
+                    let mut t = TileSetData::new();
+                    t.set_tile_shape(shape);
+                    t.set_tile_offset_axis(axis);
+                    t.set_tile_layout(layout);
+                    for cell in [Vector2i::new(0, 0), Vector2i::new(1, 0), Vector2i::new(0, 1), Vector2i::new(3, 2), Vector2i::new(-2, 4)] {
+                        let local = t.map_to_local(cell).unwrap();
+                        assert_eq!(t.local_to_map(local), Some(cell), "{shape:?} {axis:?} {layout:?} {cell:?}");
+                    }
+                }
+            }
+        }
     }
 }
