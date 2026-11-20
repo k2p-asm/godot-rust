@@ -9,7 +9,9 @@
 //! Not ported: tilts, `sample_baked_with_rotation`/posture, `Curve3D`, and the
 //! `Resource` plumbing. Non-differential: `curve.cpp` pulls `ClassDB`.
 
+use crate::math::transform_2d::Transform2D;
 use crate::math::vector2::Vector2;
+use crate::math::funcs;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -47,6 +49,7 @@ pub struct Curve2D {
     bake_interval: f32,
     baked_points: Vec<Vector2>,
     baked_dist: Vec<f32>,
+    baked_forward: Vec<Vector2>,
     baked_max_ofs: f32,
     baked_dirty: bool,
 }
@@ -64,6 +67,7 @@ impl Curve2D {
             bake_interval: 5.0,
             baked_points: Vec::new(),
             baked_dist: Vec::new(),
+            baked_forward: Vec::new(),
             baked_max_ofs: 0.0,
             baked_dirty: true,
         }
@@ -156,6 +160,42 @@ impl Curve2D {
         self.sample(f as i32, f % 1.0)
     }
 
+    /// `_calculate_tangent`: derivative direction with the engine's corner
+    /// cases for zero-length handles.
+    fn calculate_tangent(
+        begin: Vector2,
+        control_1: Vector2,
+        control_2: Vector2,
+        end: Vector2,
+        t: f32,
+    ) -> Vector2 {
+        if funcs::is_zero_approx(t) {
+            if control_1.is_equal_approx(begin) {
+                if control_1.is_equal_approx(control_2) {
+                    return (end - begin).normalized();
+                } else {
+                    return (control_2 - begin).normalized();
+                }
+            }
+        } else if funcs::is_zero_approx(t - 1.0) {
+            if control_2.is_equal_approx(end) {
+                if control_2.is_equal_approx(control_1) {
+                    return (end - begin).normalized();
+                } else {
+                    return (end - control_1).normalized();
+                }
+            }
+        }
+
+        if control_1.is_equal_approx(end) && control_2.is_equal_approx(begin) {
+            return (end - begin).normalized();
+        }
+
+        begin
+            .bezier_derivative(control_1, control_2, end, t)
+            .normalized()
+    }
+
     /// `_bake_segment2d_even_length`: split until the chord is short enough or
     /// the depth budget is spent.
     #[allow(clippy::too_many_arguments)]
@@ -194,6 +234,7 @@ impl Curve2D {
 
         self.baked_points.clear();
         self.baked_dist.clear();
+        self.baked_forward.clear();
 
         if self.points.is_empty() {
             return;
@@ -201,12 +242,23 @@ impl Curve2D {
         if self.points.len() == 1 {
             self.baked_points.push(self.points[0].position);
             self.baked_dist.push(0.0);
+            // The engine seeds a single-point curve with a small +Y forward.
+            self.baked_forward.push(Vector2::new(0.0, 0.1));
             return;
         }
 
-        // Tessellate every segment, then assemble in curve order.
+        // Tessellate every segment, then assemble in curve order, keeping the
+        // tangent at each baked point for `sample_baked_with_rotation`.
         let mut baked = Vec::new();
-        baked.push(self.points[0].position);
+        let mut forward = Vec::new();
+        {
+            let a = self.points[0].position;
+            let a_out = self.points[0].out;
+            let b = self.points[1].position;
+            let b_in = self.points[1].in_;
+            baked.push(a);
+            forward.push(Self::calculate_tangent(a, a + a_out, b + b_in, b, 0.0));
+        }
 
         for i in 0..self.points.len() - 1 {
             let a = self.points[i].position;
@@ -227,10 +279,13 @@ impl Curve2D {
                 10,
                 self.bake_interval,
             );
-            for (_, p) in mid {
+            for (key, p) in mid {
+                let t = f32::from_bits(key);
                 baked.push(p);
+                forward.push(Self::calculate_tangent(a, a + a_out, b + b_in, b, t));
             }
             baked.push(b);
+            forward.push(Self::calculate_tangent(a, a + a_out, b + b_in, b, 1.0));
         }
 
         self.baked_dist.push(0.0);
@@ -240,6 +295,7 @@ impl Curve2D {
         }
         self.baked_max_ofs = *self.baked_dist.last().unwrap();
         self.baked_points = baked;
+        self.baked_forward = forward;
     }
 
     /// `_bake_segment2d`: angle-based tessellation. Inserts midpoints where the
@@ -448,6 +504,39 @@ impl Curve2D {
             None => Vector2::ZERO,
         }
     }
+
+    /// `sample_baked_with_rotation`: position plus the interpolated tangent as a
+    /// `Transform2D` (forward, side, origin).
+    pub fn sample_baked_with_rotation(&mut self, offset: f32, cubic: bool) -> Transform2D {
+        if !offset.is_finite() {
+            return Transform2D::IDENTITY;
+        }
+        if self.baked_dirty {
+            self.bake();
+        }
+        if self.baked_points.is_empty() {
+            return Transform2D::IDENTITY;
+        }
+        if self.baked_points.len() == 1 {
+            let mut t = Transform2D::IDENTITY;
+            t.columns[2] = self.baked_points[0];
+            return t;
+        }
+
+        let offset = offset.clamp(0.0, self.get_baked_length());
+        let Some(interval) = self.find_interval(offset) else {
+            return Transform2D::IDENTITY;
+        };
+        let pos = self.sample_interval(interval, cubic);
+
+        let begin = self.baked_forward[interval.idx];
+        let end = self.baked_forward[interval.idx + 1];
+        let forward = begin.slerp(end, interval.frac).normalized();
+        let side = Vector2::new(-forward.y, forward.x);
+        Transform2D {
+            columns: [forward, side, pos],
+        }
+    }
 }
 
 #[cfg(test)]
@@ -628,5 +717,55 @@ mod tests {
         c.set_point_position(1, Vector2::new(20.0, 0.0));
         let after = c.get_baked_length();
         assert!((after - 20.0).abs() < 1e-4, "{before} -> {after}");
+    }
+
+    #[test]
+    fn baked_rotation_follows_the_tangent() {
+        let mut c = straight(10.0);
+        let start = c.sample_baked_with_rotation(0.0, false);
+        assert!((start.columns[0] - Vector2::new(1.0, 0.0)).length() < 1e-5);
+        assert_eq!(start.columns[0].angle(), 0.0);
+        assert_eq!(start.columns[2], Vector2::ZERO);
+
+        let mid = c.sample_baked_with_rotation(5.0, false);
+        assert!((mid.columns[2] - Vector2::new(5.0, 0.0)).length() < 1e-4);
+        assert_eq!(mid.columns[0].angle(), 0.0);
+        // Side is forward rotated by +90 degrees.
+        assert!((mid.columns[1] - Vector2::new(0.0, 1.0)).length() < 1e-5);
+
+        // Curved segment: start tangent is +Y, midpoint tangent is +X, end is -Y.
+        let mut curved = Curve2D::new();
+        curved.add_point(Vector2::ZERO);
+        curved.add_point(Vector2::new(10.0, 0.0));
+        curved.set_point_out(0, Vector2::new(0.0, 10.0));
+        curved.set_point_in(1, Vector2::new(0.0, 10.0));
+
+        let curve_len = curved.get_baked_length();
+        let start = curved.sample_baked_with_rotation(0.0, false);
+        assert!((start.columns[0].angle() - std::f32::consts::FRAC_PI_2).abs() < 1e-4, "{:?}", start.columns[0]);
+        let middle = curved.sample_baked_with_rotation(curve_len * 0.5, false);
+        assert!(middle.columns[0].angle().abs() < 1e-3, "{:?}", middle.columns[0]);
+        let end = curved.sample_baked_with_rotation(curve_len, false);
+        assert!((end.columns[0].angle() + std::f32::consts::FRAC_PI_2).abs() < 1e-4, "{:?}", end.columns[0]);
+    }
+
+    #[test]
+    fn baked_rotation_edge_cases() {
+        let mut empty = Curve2D::new();
+        assert_eq!(empty.sample_baked_with_rotation(0.0, false), Transform2D::IDENTITY);
+        assert_eq!(empty.sample_baked_with_rotation(f32::NAN, false), Transform2D::IDENTITY);
+
+        let mut single = Curve2D::new();
+        single.add_point(Vector2::new(3.0, 4.0));
+        let t = single.sample_baked_with_rotation(0.0, false);
+        assert_eq!(t.columns[0], Vector2::new(1.0, 0.0));
+        assert_eq!(t.columns[2], Vector2::new(3.0, 4.0));
+
+        // Offsets are clamped to [0, length].
+        let mut line = straight(10.0);
+        let before = line.sample_baked_with_rotation(-5.0, false);
+        assert_eq!(before.columns[2], Vector2::ZERO);
+        let after = line.sample_baked_with_rotation(99.0, false);
+        assert!((after.columns[2] - Vector2::new(10.0, 0.0)).length() < 1e-4);
     }
 }
