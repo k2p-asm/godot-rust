@@ -3,4 +3,5 @@
 //! The engine's nodes are `Object`s; these modules carry only the numeric state
 //! those nodes own, so they can be verified before the object layer exists.
 
+pub mod canvas_item;
 pub mod node_2d;
