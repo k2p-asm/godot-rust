@@ -13,13 +13,19 @@
 
 use crate::string::string_name::StringName;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NodePath {
     path: Vec<StringName>,
     subpath: Vec<StringName>,
     absolute: bool,
     /// The engine leaves `data` null for an empty path; the flag models that.
     empty: bool,
+}
+
+impl Default for NodePath {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NodePath {

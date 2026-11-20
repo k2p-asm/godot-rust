@@ -44,6 +44,7 @@ pub mod color_picker_button;
 pub mod graph_frame;
 pub mod texture_rect;
 pub mod touch_button;
+pub mod two_bone_ik_3d;
 pub mod soft_body_3d;
 pub mod vehicle_nodes;
 pub mod curve_texture;
