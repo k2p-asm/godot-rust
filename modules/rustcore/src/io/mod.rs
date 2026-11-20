@@ -6,6 +6,7 @@ pub mod file_access_pack;
 pub mod file_access_std;
 pub mod file_access_helpers;
 pub mod file_access_memory;
+pub mod http_client;
 pub mod ip_address;
 pub mod json;
 pub mod logger;
