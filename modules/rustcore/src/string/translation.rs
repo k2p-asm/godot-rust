@@ -16,6 +16,7 @@
 
 use std::collections::HashMap;
 
+use crate::string::plural_rules::PluralRules;
 use crate::string::string_name::StringName;
 
 #[derive(Clone, Debug)]
@@ -114,8 +115,22 @@ impl TranslationData {
         if forms.is_empty() {
             return StringName::new("");
         }
-        let index = if n == 1 { 0 } else { 1.min(forms.len() - 1) };
-        forms[index]
+        // With a parseable `plural_rules_override` the engine evaluates the
+        // gettext rule; otherwise it falls back to the one/other rule here.
+        let index = match PluralRules::parse(&self.plural_rules_override) {
+            Ok(rules) => rules.evaluate(n),
+            Err(_) => {
+                if n == 1 {
+                    0
+                } else {
+                    1
+                }
+            }
+        };
+        if index < 0 || index as usize >= forms.len() {
+            return StringName::new("");
+        }
+        forms[index as usize]
     }
 
     pub fn erase_message(&mut self, source: &str, context: &str) {
@@ -225,12 +240,37 @@ mod tests {
     }
 
     #[test]
-    fn plural_index_clamps_to_the_available_forms() {
+    fn plural_index_must_exist_in_the_form_list() {
         let mut t = TranslationData::new();
-        // Only one form: every count uses it.
+        // Only one form: the one/other rule asks for index 1 for n != 1, which
+        // does not exist, so the engine's ERR_FAIL_INDEX_V returns an empty name.
         assert!(t.add_plural_message("one", &["solo".to_string()], ""));
         assert_eq!(t.get_plural_message("one", "ones", 1, "").as_string(), "solo");
-        assert_eq!(t.get_plural_message("one", "ones", 7, "").as_string(), "solo");
+        assert_eq!(t.get_plural_message("one", "ones", 7, "").as_string(), "");
+    }
+
+    #[test]
+    fn plural_rules_override_selects_the_form() {
+        let mut t = TranslationData::new();
+        // Russian-style: 1 -> 0, 2..4 -> 1, everything else -> 2.
+        t.set_plural_rules_override(
+            "nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;",
+        );
+        assert!(t.add_plural_message(
+            "apple",
+            &["yabloko".to_string(), "yabloka".to_string(), "yablok".to_string()],
+            ""
+        ));
+        assert_eq!(t.get_plural_message("apple", "apples", 1, "").as_string(), "yabloko");
+        assert_eq!(t.get_plural_message("apple", "apples", 3, "").as_string(), "yabloka");
+        assert_eq!(t.get_plural_message("apple", "apples", 5, "").as_string(), "yablok");
+        assert_eq!(t.get_plural_message("apple", "apples", 21, "").as_string(), "yabloko");
+        assert_eq!(t.get_plural_message("apple", "apples", 11, "").as_string(), "yablok");
+
+        // An unparseable override falls back to the one/other rule.
+        t.set_plural_rules_override("not a rule");
+        assert_eq!(t.get_plural_message("apple", "apples", 1, "").as_string(), "yabloko");
+        assert_eq!(t.get_plural_message("apple", "apples", 2, "").as_string(), "yabloka");
     }
 
     #[test]
