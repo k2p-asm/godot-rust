@@ -38,6 +38,7 @@ pub mod physics_body_2d;
 pub mod flow_container;
 pub mod navigation_nodes_2d;
 pub mod physics_material;
+pub mod polygon_path_finder;
 pub mod split_container;
 pub mod canvas_extras;
 pub mod joints_3d;
