@@ -6,6 +6,7 @@ pub mod char_range;
 pub mod gstring;
 pub mod node_path;
 pub mod num;
+pub mod optimized_translation;
 pub mod slices;
 pub mod plural_rules;
 pub mod string_builder;
