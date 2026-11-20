@@ -733,11 +733,24 @@ pub fn parse(text: &str) -> Result<Variant, ParseError> {
     };
     let token = parser.get_token()?;
     let value = parser.parse_value(token, 0)?;
-    let trailing = parser.get_token()?;
-    if trailing != Token::Eof {
+    if parser.get_token()? != Token::Eof {
         return parser.error("Expected end of text");
     }
     Ok(value)
+}
+
+/// Parses one value and returns how many characters of `text` it consumed, so
+/// callers such as `ConfigFile` can continue after it. Trailing whitespace and
+/// comments are left for the caller.
+pub fn parse_prefix(text: &str) -> Result<(Variant, usize), ParseError> {
+    let mut parser = Parser {
+        chars: text.chars().collect(),
+        pos: 0,
+        line: 0,
+    };
+    let token = parser.get_token()?;
+    let value = parser.parse_value(token, 0)?;
+    Ok((value, parser.pos))
 }
 
 /// Parses a constructor's argument list from `text` (used by tests and by
