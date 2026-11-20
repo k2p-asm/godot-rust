@@ -21,6 +21,7 @@ pub mod margin_center;
 pub mod node;
 pub mod polygon_2d;
 pub mod scene_tree;
+pub mod scroll_container;
 pub mod node_2d;
 pub mod node_tree;
 pub mod parallax_layer;
