@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **339 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **343 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -148,7 +148,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/transform_2d.rs` | `core/math/transform_2d.*` | complete |
 | `scene/node_2d.rs` | `scene/2d/node_2d.*` (data half) | position/rotation/scale/skew with the engine's lazy decomposition of `set_transform`, zero-scale clamp, `rotate`/`translate`, relative transform. `set_rotation_scale_and_skew` is differential (`t2.rs_skew*`). Parenting and notifications need the object layer |
 | `scene/canvas_item.rs` | `scene/main/canvas_item.*` (data half) | visibility with the cached `parent_visible_in_tree`, `modulate`/`self_modulate` + ancestor composition, `z_index` range check (`-4096..=4096`) and relative composition, `y_sort_enabled`, `show_behind_parent`, clip mode, light/visibility layers |
-| `scene/camera_2d.rs` | `scene/2d/camera_2d.*` (state + `align`) | anchor mode, offset, zoom with zero rejection and reciprocal `zoom_scale`, drag margins/offsets/enabled flags, limits, smoothing speeds (clamped to >= 0), process callback, and the `align` position math for both anchors. Smooth-follow state and limit clamping need the viewport. **Non-differential** |
+| `scene/camera_2d.rs` | `scene/2d/camera_2d.*` (state + `align`) | anchor mode, offset, zoom with zero rejection and reciprocal `zoom_scale`, drag margins/offsets/enabled flags, limits, smoothing speeds (clamped to >= 0), process callback, and the `align` position math for both anchors, plus `get_camera_transform` with limit clamping (left/right/top/bottom, split-centering when the viewport is wider than the limits), zoom on the basis, optional rotation and position smoothing, and `get_camera_screen_center`. **Non-differential** |
 | `scene/node.rs` | `scene/main/node.*` (data half) | name/owner, unique-name flag, `ProcessMode` (inherit/pausable/when-paused/always/disabled) with the engine resolution and `can_process` matrix, process/physics priorities, thread group, `inside_tree`, and the eight `set_process*` flags. **Non-differential** (needs the tree/object layer) |
 | `scene/sprite_2d.rs` | `scene/2d/sprite_2d.*` (geometry) | Texture reduced to its size; frame grid (`hframes`x`vframes`) with the engine frame/column retention rules, `frame_coords`, centered/offset/flip, region rect and filter clip, `get_rect`/`get_rects`. Drawing and `is_pixel_opaque` need pixels. **Non-differential** |
 | `scene/gradient.rs` | `scene/resources/gradient.*` | Offset-sorted stops, the engine binary search with its `middle--` correction and end clamping, Constant/Linear/Cubic modes, and sRGB / linear-sRGB / Oklab interpolation. **Non-differential** (`Resource`) |

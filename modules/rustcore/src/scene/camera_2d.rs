@@ -11,6 +11,7 @@
 //! `get_camera_transform`. Those depend on the viewport and the node tree.
 
 use crate::math::funcs;
+use crate::math::transform_2d::Transform2D;
 use crate::math::vector2::Vector2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,6 +47,14 @@ pub struct Camera2DData {
     limit_right: i32,
     limit_bottom: i32,
     process_callback: Camera2DProcessCallback,
+    limit_enabled: bool,
+    limit_smoothing_enabled: bool,
+    ignore_rotation: bool,
+    rotation_smoothing_enabled: bool,
+    rotation_smoothing_speed: f32,
+    camera_angle: f32,
+    smoothed_camera_pos: Vector2,
+    camera_screen_center: Vector2,
 }
 
 impl Default for Camera2DData {
@@ -74,6 +83,14 @@ impl Camera2DData {
             limit_right: LIMIT_DEFAULT,
             limit_bottom: LIMIT_DEFAULT,
             process_callback: Camera2DProcessCallback::Idle,
+            limit_enabled: true,
+            limit_smoothing_enabled: false,
+            ignore_rotation: true,
+            rotation_smoothing_enabled: false,
+            rotation_smoothing_speed: 5.0,
+            camera_angle: 0.0,
+            smoothed_camera_pos: Vector2::ZERO,
+            camera_screen_center: Vector2::ZERO,
         }
     }
 
@@ -214,6 +231,146 @@ impl Camera2DData {
         self.process_callback
     }
 
+    pub fn set_limit_enabled(&mut self, enabled: bool) {
+        self.limit_enabled = enabled;
+    }
+
+    pub fn is_limit_enabled(&self) -> bool {
+        self.limit_enabled
+    }
+
+    pub fn set_limit_smoothing_enabled(&mut self, enabled: bool) {
+        self.limit_smoothing_enabled = enabled;
+    }
+
+    pub fn is_limit_smoothing_enabled(&self) -> bool {
+        self.limit_smoothing_enabled
+    }
+
+    pub fn set_ignore_rotation(&mut self, ignore: bool) {
+        self.ignore_rotation = ignore;
+    }
+
+    pub fn is_ignoring_rotation(&self) -> bool {
+        self.ignore_rotation
+    }
+
+    pub fn set_rotation_smoothing_enabled(&mut self, enabled: bool) {
+        self.rotation_smoothing_enabled = enabled;
+    }
+
+    pub fn rotation_smoothing_enabled(&self) -> bool {
+        self.rotation_smoothing_enabled
+    }
+
+    pub fn set_rotation_smoothing_speed(&mut self, speed: f32) {
+        self.rotation_smoothing_speed = speed.max(0.0);
+    }
+
+    pub fn get_rotation_smoothing_speed(&self) -> f32 {
+        self.rotation_smoothing_speed
+    }
+
+    pub fn get_camera_angle(&self) -> f32 {
+        self.camera_angle
+    }
+
+    pub fn get_camera_screen_center(&self) -> Vector2 {
+        self.camera_screen_center
+    }
+
+    /// `get_camera_transform`: builds the viewport canvas transform and returns
+    /// its inverse. `delta` is the process delta for the smoothing steps.
+    ///
+    /// The `first` special case and the physics-interpolation path are not
+    /// reproduced; the limit-smoothing branch is skipped when smoothing is on,
+    /// like the engine's second pass.
+    pub fn get_camera_transform(
+        &mut self,
+        screen_size: Vector2,
+        global_position: Vector2,
+        global_rotation: f32,
+        delta: f32,
+    ) -> Transform2D {
+        let target = self.align_position(screen_size, global_position);
+        if self.position_smoothing_enabled {
+            let c = self.position_smoothing_speed * delta;
+            self.smoothed_camera_pos =
+                (target - self.smoothed_camera_pos) * c + self.smoothed_camera_pos;
+        } else {
+            self.smoothed_camera_pos = target;
+        }
+        let ret_camera_pos = self.smoothed_camera_pos;
+
+        let mut screen_offset = if self.anchor_mode == AnchorMode::DragCenter {
+            screen_size * 0.5 * self.zoom_scale
+        } else {
+            Vector2::ZERO
+        };
+
+        if !self.ignore_rotation {
+            if self.rotation_smoothing_enabled {
+                let step = self.rotation_smoothing_speed * delta;
+                self.camera_angle = crate::math::funcs::lerp_angle(
+                    self.camera_angle as f64,
+                    global_rotation as f64,
+                    step as f64,
+                ) as f32;
+            } else {
+                self.camera_angle = global_rotation;
+            }
+            screen_offset = screen_offset.rotated(self.camera_angle);
+        }
+
+        let mut screen_rect_pos = -screen_offset + ret_camera_pos;
+        let rect_size = screen_size * self.zoom_scale;
+
+        if self.limit_enabled && (!self.position_smoothing_enabled || !self.limit_smoothing_enabled) {
+            let bottom_right = Vector2::new(
+                screen_rect_pos.x + 2.0 * (ret_camera_pos.x - screen_rect_pos.x),
+                screen_rect_pos.y + 2.0 * (ret_camera_pos.y - screen_rect_pos.y),
+            );
+            let width = bottom_right.x - screen_rect_pos.x;
+            let height = bottom_right.y - screen_rect_pos.y;
+            let left = self.limit_left as f32;
+            let right = self.limit_right as f32;
+            let top = self.limit_top as f32;
+            let bottom = self.limit_bottom as f32;
+
+            if left > right - width {
+                screen_rect_pos.x = (left + right - width) / 2.0;
+            } else if screen_rect_pos.x < left {
+                screen_rect_pos.x = left;
+            } else if bottom_right.x > right {
+                screen_rect_pos.x = right - width;
+            }
+
+            if top > bottom - height {
+                screen_rect_pos.y = (top + bottom - height) / 2.0;
+            } else if screen_rect_pos.y < top {
+                screen_rect_pos.y = top;
+            } else if bottom_right.y > bottom {
+                screen_rect_pos.y = bottom - height;
+            }
+        }
+
+        if self.offset != Vector2::ZERO {
+            screen_rect_pos += self.offset;
+        }
+
+        let mut xform = Transform2D::IDENTITY;
+        xform.scale_basis(self.zoom_scale);
+        if !self.ignore_rotation {
+            xform.set_rotation(self.camera_angle);
+        }
+        xform.set_origin(screen_rect_pos);
+
+        self.camera_screen_center = xform.xform(screen_size * 0.5);
+        let _ = rect_size; // zoom is applied through `zoom_scale` on the basis
+
+        xform.affine_inverse()
+    }
+
     /// `Camera2D::align`: the camera position for a node at `global_position`
     /// and a viewport of `screen_size`.
     pub fn align_position(&self, screen_size: Vector2, global_position: Vector2) -> Vector2 {
@@ -303,6 +460,66 @@ mod tests {
         // Out-of-range sides are rejected.
         assert!(!c.set_drag_margin(4, 1.0));
         assert_eq!(c.get_drag_margin(9), 0.0);
+    }
+
+    #[test]
+    fn camera_transform_centers_and_limits() {
+        let mut c = Camera2DData::new();
+        let screen = Vector2::new(100.0, 100.0);
+
+        // Centered at the origin: the viewport covers [-50, 50].
+        let inv = c.get_camera_transform(screen, Vector2::ZERO, 0.0, 1.0 / 60.0);
+        assert!((inv.xform(Vector2::new(-50.0, -50.0))).length() < 1e-4);
+        assert!((c.get_camera_screen_center()).length() < 1e-4);
+
+        // Left limit at 0: the visible rect cannot start before 0.
+        c.set_limit(1, 0); // left
+        let inv = c.get_camera_transform(screen, Vector2::new(-100.0, 0.0), 0.0, 1.0 / 60.0);
+        // World origin maps to the left edge of the screen.
+        let screen_pos = inv.affine_inverse().xform(Vector2::ZERO);
+        assert!((screen_pos.x).abs() < 1e-4, "{screen_pos:?}");
+    }
+
+    #[test]
+    fn camera_transform_applies_zoom_to_the_basis() {
+        let mut c = Camera2DData::new();
+        c.set_zoom(Vector2::new(2.0, 2.0));
+        let inv = c.get_camera_transform(Vector2::new(100.0, 100.0), Vector2::ZERO, 0.0, 1.0 / 60.0);
+        // A 10-unit world step is 20 screen pixels at zoom 2.
+        let p0 = inv.xform(Vector2::ZERO);
+        let p1 = inv.xform(Vector2::new(10.0, 0.0));
+        assert!(((p1 - p0).x - 20.0).abs() < 1e-4, "{p0:?} {p1:?}");
+    }
+
+    #[test]
+    fn rotation_is_ignored_by_default_and_applied_when_enabled() {
+        let mut c = Camera2DData::new();
+        assert!(c.is_ignoring_rotation());
+        let inv = c.get_camera_transform(Vector2::new(100.0, 100.0), Vector2::ZERO, std::f32::consts::FRAC_PI_2, 1.0 / 60.0);
+        // Ignored: world X still maps to screen X.
+        let d = inv.xform(Vector2::new(10.0, 0.0)) - inv.xform(Vector2::ZERO);
+        assert!((d.y).abs() < 1e-4, "{d:?}");
+
+        c.set_ignore_rotation(false);
+        let inv = c.get_camera_transform(Vector2::new(100.0, 100.0), Vector2::ZERO, std::f32::consts::FRAC_PI_2, 1.0 / 60.0);
+        let d = inv.xform(Vector2::new(10.0, 0.0)) - inv.xform(Vector2::ZERO);
+        // A 90 degree camera turns world +X into screen -Y (inverse transform).
+        assert!(d.x.abs() < 1e-4 && (d.y + 10.0).abs() < 1e-3, "{d:?}");
+    }
+
+    #[test]
+    fn position_smoothing_moves_a_fraction_per_step() {
+        let mut c = Camera2DData::new();
+        c.set_position_smoothing_enabled(true);
+        c.set_position_smoothing_speed(10.0);
+        // Target is (100, 0); one step of delta 0.1 moves 100 * 10 * 0.1 = 100.
+        c.get_camera_transform(Vector2::new(100.0, 100.0), Vector2::new(100.0, 0.0), 0.0, 0.1);
+        assert!((c.get_camera_screen_center().x - 100.0).abs() < 1e-3);
+
+        c.set_position_smoothing_speed(1.0);
+        c.get_camera_transform(Vector2::new(100.0, 100.0), Vector2::new(200.0, 0.0), 0.0, 0.1);
+        // Moving from 100 toward 200 with c = 0.1: 110.
+        assert!((c.get_camera_screen_center().x - 110.0).abs() < 0.5);
     }
 
     #[test]
