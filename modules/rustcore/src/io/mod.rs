@@ -12,6 +12,7 @@ pub mod json_native;
 pub mod path_utils;
 pub mod plist;
 pub mod resource_uid;
+pub mod stream_peer;
 pub mod translation_loader_po;
 pub mod variant_parser;
 pub mod xml_parser;
