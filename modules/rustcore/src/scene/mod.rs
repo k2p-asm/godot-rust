@@ -3,6 +3,7 @@
 //! The engine's nodes are `Object`s; these modules carry only the numeric state
 //! those nodes own, so they can be verified before the object layer exists.
 
+pub mod camera_2d;
 pub mod canvas_item;
 pub mod curve;
 pub mod curve_2d;
