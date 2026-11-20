@@ -8,6 +8,7 @@ pub mod animation;
 pub mod animation_mixer;
 pub mod animation_player;
 pub mod canvas_item;
+pub mod control;
 pub mod curve;
 pub mod curve_2d;
 pub mod curve_3d;
