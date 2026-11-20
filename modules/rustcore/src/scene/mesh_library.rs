@@ -17,10 +17,18 @@ use crate::servers::rid::Rid;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i32)]
 pub enum ShadowCastingSetting {
+    // default is On, as in the engine's geometry instance
+
     Off,
     On,
     DoubleSided,
     ShadowsOnly,
+}
+
+impl Default for ShadowCastingSetting {
+    fn default() -> Self {
+        ShadowCastingSetting::On
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -47,6 +47,12 @@ pub enum VisibilityRangeFadeMode {
     Dependencies,
 }
 
+impl Default for VisibilityRangeFadeMode {
+    fn default() -> Self {
+        VisibilityRangeFadeMode::Disabled
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct VisualInstance3DData {
     layers: u32,
