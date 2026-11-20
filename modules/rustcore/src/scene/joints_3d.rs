@@ -369,6 +369,199 @@ impl ConeTwistJoint3DData {
     }
 }
 
+// -- Generic6DOFJoint3D -----------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i32)]
+pub enum G6dofParam {
+    LinearLowerLimit,
+    LinearUpperLimit,
+    LinearLimitSoftness,
+    LinearRestitution,
+    LinearDamping,
+    LinearMotorTargetVelocity,
+    LinearMotorForceLimit,
+    LinearSpringStiffness,
+    LinearSpringDamping,
+    LinearSpringEquilibriumPoint,
+    AngularLowerLimit,
+    AngularUpperLimit,
+    AngularLimitSoftness,
+    AngularDamping,
+    AngularRestitution,
+    AngularForceLimit,
+    AngularErp,
+    AngularMotorTargetVelocity,
+    AngularMotorForceLimit,
+    AngularSpringStiffness,
+    AngularSpringDamping,
+    AngularSpringEquilibriumPoint,
+    Max,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i32)]
+pub enum G6dofFlag {
+    EnableLinearLimit,
+    EnableAngularLimit,
+    EnableLinearSpring,
+    EnableAngularSpring,
+    EnableMotor,
+    EnableLinearMotor,
+    Max,
+}
+
+pub const G6DOF_PARAM_MAX: usize = 22;
+pub const G6DOF_FLAG_MAX: usize = 6;
+
+/// The per-axis parameter/flag tables of `Generic6DOFJoint3D`.
+#[derive(Clone, Debug)]
+pub struct Generic6DOFJoint3DData {
+    pub base: Joint3DData,
+    params_x: [f32; G6DOF_PARAM_MAX],
+    params_y: [f32; G6DOF_PARAM_MAX],
+    params_z: [f32; G6DOF_PARAM_MAX],
+    flags_x: [bool; G6DOF_FLAG_MAX],
+    flags_y: [bool; G6DOF_FLAG_MAX],
+    flags_z: [bool; G6DOF_FLAG_MAX],
+}
+
+impl Default for Generic6DOFJoint3DData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Generic6DOFJoint3DData {
+    pub fn new() -> Self {
+        // The constructor sets the same table on all three axes.
+        let params = [
+            0.0,   // linear lower limit
+            0.0,   // linear upper limit
+            0.7,   // linear limit softness
+            0.5,   // linear restitution
+            1.0,   // linear damping
+            0.0,   // linear motor target velocity
+            0.0,   // linear motor force limit
+            0.01,  // linear spring stiffness
+            0.01,  // linear spring damping
+            0.0,   // linear spring equilibrium point
+            0.0,   // angular lower limit
+            0.0,   // angular upper limit
+            0.5,   // angular limit softness
+            1.0,   // angular damping
+            0.0,   // angular restitution
+            0.0,   // angular force limit
+            0.5,   // angular ERP
+            0.0,   // angular motor target velocity
+            300.0, // angular motor force limit
+            0.0,   // angular spring stiffness
+            0.0,   // angular spring damping
+            0.0,   // angular spring equilibrium point
+        ];
+        let flags = [true, true, false, false, false, false];
+        Self {
+            base: Joint3DData::new(),
+            params_x: params,
+            params_y: params,
+            params_z: params,
+            flags_x: flags,
+            flags_y: flags,
+            flags_z: flags,
+        }
+    }
+
+    pub fn set_param_x(&mut self, param: G6dofParam, value: f32) -> bool {
+        if param == G6dofParam::Max {
+            return false;
+        }
+        self.params_x[param as usize] = value;
+        true
+    }
+
+    pub fn get_param_x(&self, param: G6dofParam) -> Option<f32> {
+        if param == G6dofParam::Max {
+            return None;
+        }
+        Some(self.params_x[param as usize])
+    }
+
+    pub fn set_param_y(&mut self, param: G6dofParam, value: f32) -> bool {
+        if param == G6dofParam::Max {
+            return false;
+        }
+        self.params_y[param as usize] = value;
+        true
+    }
+
+    pub fn get_param_y(&self, param: G6dofParam) -> Option<f32> {
+        if param == G6dofParam::Max {
+            return None;
+        }
+        Some(self.params_y[param as usize])
+    }
+
+    pub fn set_param_z(&mut self, param: G6dofParam, value: f32) -> bool {
+        if param == G6dofParam::Max {
+            return false;
+        }
+        self.params_z[param as usize] = value;
+        true
+    }
+
+    pub fn get_param_z(&self, param: G6dofParam) -> Option<f32> {
+        if param == G6dofParam::Max {
+            return None;
+        }
+        Some(self.params_z[param as usize])
+    }
+
+    pub fn set_flag_x(&mut self, flag: G6dofFlag, enabled: bool) -> bool {
+        if flag == G6dofFlag::Max {
+            return false;
+        }
+        self.flags_x[flag as usize] = enabled;
+        true
+    }
+
+    pub fn get_flag_x(&self, flag: G6dofFlag) -> bool {
+        if flag == G6dofFlag::Max {
+            return false;
+        }
+        self.flags_x[flag as usize]
+    }
+
+    pub fn set_flag_y(&mut self, flag: G6dofFlag, enabled: bool) -> bool {
+        if flag == G6dofFlag::Max {
+            return false;
+        }
+        self.flags_y[flag as usize] = enabled;
+        true
+    }
+
+    pub fn get_flag_y(&self, flag: G6dofFlag) -> bool {
+        if flag == G6dofFlag::Max {
+            return false;
+        }
+        self.flags_y[flag as usize]
+    }
+
+    pub fn set_flag_z(&mut self, flag: G6dofFlag, enabled: bool) -> bool {
+        if flag == G6dofFlag::Max {
+            return false;
+        }
+        self.flags_z[flag as usize] = enabled;
+        true
+    }
+
+    pub fn get_flag_z(&self, flag: G6dofFlag) -> bool {
+        if flag == G6dofFlag::Max {
+            return false;
+        }
+        self.flags_z[flag as usize]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -474,5 +667,78 @@ mod tests {
         assert_eq!(ConeTwistParam::SwingSpan as i32, 0);
         assert_eq!(ConeTwistParam::Relaxation as i32, 4);
         assert_eq!(ConeTwistParam::Max as i32, 5);
+    }
+
+    #[test]
+    fn generic_6dof_defaults() {
+        let mut g = Generic6DOFJoint3DData::new();
+
+        // All three axes start with the same table.
+        for axis in 0..3 {
+            let get = |param: G6dofParam| match axis {
+                0 => g.get_param_x(param),
+                1 => g.get_param_y(param),
+                _ => g.get_param_z(param),
+            };
+            assert_eq!(get(G6dofParam::LinearLowerLimit), Some(0.0));
+            assert_eq!(get(G6dofParam::LinearUpperLimit), Some(0.0));
+            assert!((get(G6dofParam::LinearLimitSoftness).unwrap() - 0.7).abs() < 1e-6);
+            assert!((get(G6dofParam::LinearRestitution).unwrap() - 0.5).abs() < 1e-6);
+            assert!((get(G6dofParam::LinearDamping).unwrap() - 1.0).abs() < 1e-6);
+            assert!((get(G6dofParam::LinearSpringStiffness).unwrap() - 0.01).abs() < 1e-6);
+            assert!((get(G6dofParam::LinearSpringDamping).unwrap() - 0.01).abs() < 1e-6);
+            assert!((get(G6dofParam::AngularLimitSoftness).unwrap() - 0.5).abs() < 1e-6);
+            assert!((get(G6dofParam::AngularDamping).unwrap() - 1.0).abs() < 1e-6);
+            assert!((get(G6dofParam::AngularErp).unwrap() - 0.5).abs() < 1e-6);
+            assert!((get(G6dofParam::AngularMotorForceLimit).unwrap() - 300.0).abs() < 1e-6);
+        }
+
+        // Limits are enabled, motors and springs are not.
+        for axis in 0..3 {
+            let flag = |flag: G6dofFlag| match axis {
+                0 => g.get_flag_x(flag),
+                1 => g.get_flag_y(flag),
+                _ => g.get_flag_z(flag),
+            };
+            assert!(flag(G6dofFlag::EnableLinearLimit));
+            assert!(flag(G6dofFlag::EnableAngularLimit));
+            assert!(!flag(G6dofFlag::EnableLinearSpring));
+            assert!(!flag(G6dofFlag::EnableAngularSpring));
+            assert!(!flag(G6dofFlag::EnableMotor));
+            assert!(!flag(G6dofFlag::EnableLinearMotor));
+        }
+    }
+
+    #[test]
+    fn generic_6dof_axes_are_independent() {
+        let mut g = Generic6DOFJoint3DData::new();
+        assert!(g.set_param_x(G6dofParam::LinearUpperLimit, 1.0));
+        assert!(g.set_param_y(G6dofParam::LinearUpperLimit, 2.0));
+        assert!(g.set_param_z(G6dofParam::LinearUpperLimit, 3.0));
+        assert_eq!(g.get_param_x(G6dofParam::LinearUpperLimit), Some(1.0));
+        assert_eq!(g.get_param_y(G6dofParam::LinearUpperLimit), Some(2.0));
+        assert_eq!(g.get_param_z(G6dofParam::LinearUpperLimit), Some(3.0));
+
+        assert!(g.set_flag_x(G6dofFlag::EnableMotor, true));
+        assert!(!g.get_flag_y(G6dofFlag::EnableMotor));
+        assert!(!g.get_flag_z(G6dofFlag::EnableMotor));
+        assert!(g.get_flag_x(G6dofFlag::EnableMotor));
+
+        // Sentinels are rejected on every axis.
+        assert!(!g.set_param_x(G6dofParam::Max, 1.0));
+        assert!(!g.set_param_y(G6dofParam::Max, 1.0));
+        assert!(!g.set_param_z(G6dofParam::Max, 1.0));
+        assert!(!g.set_flag_x(G6dofFlag::Max, true));
+        assert!(!g.set_flag_y(G6dofFlag::Max, true));
+        assert!(!g.set_flag_z(G6dofFlag::Max, true));
+        assert_eq!(g.get_param_x(G6dofParam::Max), None);
+        assert!(!g.get_flag_x(G6dofFlag::Max));
+
+        assert_eq!(G6dofParam::LinearSpringEquilibriumPoint as i32, 9);
+        assert_eq!(G6dofParam::AngularUpperLimit as i32, 11);
+        assert_eq!(G6dofParam::Max as i32, 22);
+        assert_eq!(G6dofFlag::EnableAngularLimit as i32, 1);
+        assert_eq!(G6dofFlag::EnableLinearMotor as i32, 5);
+        assert_eq!(G6dofFlag::Max as i32, 6);
     }
 }

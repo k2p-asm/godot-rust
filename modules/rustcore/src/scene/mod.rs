@@ -23,6 +23,8 @@ pub mod canvas_item;
 pub mod canvas_item_material;
 pub mod compositor;
 pub mod control;
+pub mod worlds;
+pub mod spring_arm_3d;
 pub mod ray_cast;
 pub mod collision_shape;
 pub mod popup_menu;
