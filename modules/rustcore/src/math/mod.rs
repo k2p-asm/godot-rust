@@ -14,6 +14,7 @@ pub mod geometry_2d;
 pub mod geometry_3d;
 pub mod ok_color;
 pub mod pcg;
+pub mod random_number_generator;
 pub mod plane;
 pub mod projection;
 pub mod quaternion;

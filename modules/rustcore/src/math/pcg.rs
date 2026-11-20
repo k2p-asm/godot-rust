@@ -175,6 +175,50 @@ impl RandomPcg {
         mean + deviation * ((funcs::TAU as f32 * self.randf()).cos() * (-2.0f32 * temp.ln()).sqrt())
     }
 
+    /// `RandomPCG::randomize`: seeds from wall-clock time (seconds + micros),
+    /// exactly like `OS::get_unix_time() + get_ticks_usec()`, mixed with the
+    /// current state.
+    pub fn randomize(&mut self) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default();
+        let t = now.as_secs().wrapping_add(now.subsec_micros() as u64);
+        self.seed(t.wrapping_mul(self.get_state()).wrapping_add(PCG_DEFAULT_INC_64));
+    }
+
+    /// `RandomPCG::rand_weighted`: index chosen proportionally to its weight,
+    /// or -1 when the array is empty or contains a negative weight.
+    pub fn rand_weighted(&mut self, weights: &[f32]) -> i64 {
+        if weights.is_empty() {
+            return -1;
+        }
+        let mut sum = 0.0f32;
+        for &w in weights {
+            if w < 0.0 {
+                return -1;
+            }
+            sum += w;
+        }
+
+        let mut remaining = self.randf() * sum;
+        for (i, &w) in weights.iter().enumerate() {
+            remaining -= w;
+            if remaining < 0.0 {
+                return i as i64;
+            }
+        }
+
+        // Floating-point drift can leave `remaining` at >= 0 with no match;
+        // the engine falls back to the last positive weight.
+        for i in (0..weights.len()).rev() {
+            if weights[i] > 0.0 {
+                return i as i64;
+            }
+        }
+        -1
+    }
+
     pub fn random_f64(&mut self, from: f64, to: f64) -> f64 {
         self.randd() * (to - from) + from
     }
