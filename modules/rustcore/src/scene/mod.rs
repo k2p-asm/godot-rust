@@ -32,6 +32,7 @@ pub mod line_2d;
 pub mod canvas_layer;
 pub mod margin_center;
 pub mod mesh_instance_2d;
+pub mod mesh_library;
 pub mod node;
 pub mod placeholder_3d;
 pub mod polygon_2d;
