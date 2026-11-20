@@ -56,6 +56,17 @@ impl NodeTree {
         self.nodes.get(&id)
     }
 
+    /// Mutates a node's process mode (used by the scene tree and tests).
+    pub fn set_process_mode(&mut self, id: u64, mode: crate::scene::node::ProcessMode) -> bool {
+        match self.nodes.get_mut(&id) {
+            Some(n) => {
+                n.set_process_mode(mode);
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn get_parent(&self, id: u64) -> Option<u64> {
         self.parents.get(&id).copied()
     }
