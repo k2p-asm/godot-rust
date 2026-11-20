@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1193 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1195 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -228,6 +228,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/worlds.rs` | `scene/resources/world_2d.*`, `scene/resources/3d/world_3d.*` (state) | Canvas/navigation-map/space handles and viewport count for 2D; scenario/space/navigation-map plus environment, fallback environment, camera attributes, compositor and the registered camera list for 3D. Server/lazy-map creation not ported. **Non-differential** |
 | `scene/popup_menu.rs` | `scene/gui/popup_menu.*` (items) | Item store with text/xl-text/icon+width+modulate, checkable type (box/radio), checked, multistate count/state, visibility, separator/disabled, id, metadata, submenu, tooltip and indent; all add variants incl. icon check/radio and separators; id/text lookups; every field accessor with the engine's empty returns; removal shifting current/focused; and the popup options (three hide-on-selection flags, search, native preference, system menu, search-bar trio). Shortcuts/native menu/drawing not ported. **Non-differential** |
 | `io/marshalls.rs` | `core/io/marshalls.*` (subset) | The binary `Variant` wire format: little-endian header (low byte = type, bit 16 = 64-bit payload, bits 16..19 = typed-container metadata), nil/bool/int (32 or 64)/float (32 or 64)/string (length-prefixed UTF-8 padded to four bytes), the real-valued math types (`Vector2/2i/3/3i/4/4i`, `Rect2/2i`, `Transform2D`, `Plane`, `Quaternion`, `Aabb`, `Basis`, `Transform3D`, `Projection`), `Color` (always single precision), untyped `Array`/`Dictionary`, and the packed byte/int32/int64/float32/float64/string/vector2/vector3/vector4/color arrays, with the engine's 32/64 decode acceptance. Objects/callables/signals/node paths/RIDs/string names and typed containers report `Unsupported`. **Non-differential** |
+| `scene/parallax_and_heightfield.rs` | `scene/2d/parallax_layer.*`, `scene/3d/gpu_particles_collision_3d.*` (height field) | ParallaxLayer motion scale/offset/mirroring; GPUParticlesCollisionHeightField3D's `(1 << 20) - 1` mask with 1..=32 bits, `(2,2,2)` size, six resolutions with the `MAX` guard, follow-camera flag, two update modes and the centred AABB. Base-offset computation and bake/render calls not ported. **Non-differential** |
 | `os/keyboard.rs` | `core/os/keyboard.h` (constants) | 194 `KEY_*` constants (including `SPECIAL = 1 << 22` and the special-key block), the nine `KEY_MASK_*` modifier bits, `key_code`, `is_modifier_key` (the lock/modifier key codes) and the `KeyLocation` ints/conversion. The table is generated from the header by a porting script; the macOS-only `CMD_OR_CTRL` branch is resolved to the non-macOS value. Keycode name/string helpers not ported. **Non-differential** |
 | `scene/occluders.rs` | `scene/3d/occluder_instance_3d.*` (state) | `Occluder3D`'s baked vertices/indices with the AABB recompute, `ArrayOccluder3D` setters, Quad/Box/Sphere/Polygon parameter state (1×1, 1×1×1, radius 1, 7 rings/segments, empty polygon) and `OccluderInstance3D`'s occluder handle, `0xFFFFFFFF` bake mask with 1..=32 bits and the 0.1 simplification distance. Baking/RIDs/array generation not ported. **Non-differential** |
 | `scene/shape_cast.rs` | `scene/2d/physics/shape_cast_2d.*`, `scene/3d/physics/shape_cast_3d.*` (state) | Enabled/shape/target (2D `(0,50)`, 3D `(0,-1,0)`)/margin/mask bits/parent-exclusion/area-body flags/32 max results clamped to at least 1/safe-unsafe fractions and (3D) the debug colour, plus the hit list with per-index collider point/normal/shape (3D face index) filled through `set_results`. Physics query/debug drawing not ported. **Non-differential** |
@@ -358,6 +359,13 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
   `thirdparty/` (2.87M). Not runtime, or not ours.
 
 ## Marked pending, with the reason
+
+- **Polygon boolean/offset operations** (`Geometry2D::merge/clip/intersect/exclude_polygons`,
+  `offset_polygon/polyline`, `clip/intersect_polyline_with_polygon`) depend on
+  `thirdparty/clipper2`, `polypartition` and `stb_rect_pack` inside
+  `geometry_2d.cpp`; only the self-contained helpers (`is_polygon_clockwise`,
+  `triangulate_polygon`, `triangulate_delaunay`, `bresenham_line`,
+  `is_point_in_polygon`, segment helpers, convex hull) are ported so far.
 
 - `core/math/expression.cpp` is **partially ported** (`math/expression.rs`):
   tokenizer, precedence-climbing parser, array/dictionary literals, variables,
