@@ -2,6 +2,7 @@
 
 pub mod effects_chorus;
 pub mod effects_delay;
+pub mod effects_phaser;
 pub mod effects_simple;
 pub mod filter_sw;
 pub mod resampler;
