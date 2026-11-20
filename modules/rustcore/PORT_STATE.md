@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1491 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1490 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -197,6 +197,7 @@ um_int64`/
 um_uint64`) | bases 2-36, INT64_MIN, u64::MAX; plus 
 um_float` (fixed decimals, zero trimming, `-0.0`, inf/nan, 16-decimal cap, half-to-even rounding). **Non-differential** (see note 3) |
 | `math/fieldwise.rs` | `core/math/math_fieldwise.cpp` | `fieldwise_assign` over 14 variant types (Vector2..Transform3D), type-mismatch and unknown-field no-ops. **Non-differential** (engine code is `#ifdef DEBUG_ENABLED`) |
+| `scene/retarget_modifier_3d.rs` | `scene/3d/retarget_modifier_3d.*` (state) | Profile handle, global-pose flag and the `TRANSFORM_FLAG_*` bits (all by default) with per-mode toggles and profile set/get. Rest capture/retarget math not ported. **Non-differential** |
 | `scene/bone_modifiers_extra.rs` | `scene/3d/modifier_bone_target_3d.*`, `aim_modifier_3d.*`, `copy_transform_modifier_3d.*`, `convert_transform_modifier_3d.*` (state) | ModifierBoneTarget3D's bone name/index; AimModifier3D settings (forward axis, euler, primary rotation axis, secondary rotation, relative); CopyTransformModifier3D flags (copy/axis/invert, relative/additive); ConvertTransformModifier3D apply/reference modes, axes, ranges, relative/additive — each keeping the shared base settings array in sync on resize. Constraint evaluation not ported. **Non-differential** |
 | `scene/bone_constraint_3d.rs` | `scene/3d/bone_constraint_3d.*`, `scene/3d/limit_angular_velocity_modifier_3d.*` (state) | BoneConstraint3D's settings array (amount 1.0, apply/reference bone names and indices `-1`, reference type bone/node, reference node path, resize/clear with index guards) and LimitAngularVelocityModifier3D's chain list (root/end bone names and indices, `-1` defaults), exclusion flag and `TAU` maximum angular velocity, with chain resize/clear. Constraint/skeleton processing not ported. **Non-differential** |
 | `scene/font_state.rs` | `scene/resources/font.*` (`FontFile`/`FontVariation`/`SystemFont` state) | FontFile's source bytes, antialiasing/mipmaps/embedded-bitmap/MSDF flags and sizes, fixed size/mode, autohinter, colour glyphs, system fallback, hinting, subpixel positioning, rounding remainders, oversampling and the language/script/OpenType overrides; FontVariation's base font, variation coordinates, embolden, face index, transform, features, four spacing slots, baseline offset, palette index and custom colours; SystemFont's names/italic/weight/stretch and the shared rendering flags. Glyph shaping/raster and TextServer calls not ported. **Non-differential** |
