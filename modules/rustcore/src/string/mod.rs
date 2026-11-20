@@ -5,6 +5,7 @@ pub mod case;
 pub mod char_range;
 pub mod gstring;
 pub mod num;
+pub mod slices;
 pub mod plural_rules;
 pub mod string_name;
 pub mod translation;
