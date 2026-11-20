@@ -31,6 +31,7 @@ pub mod environment;
 pub mod gradient;
 pub mod gradient_texture;
 pub mod grid_container;
+pub mod gui_buttons;
 pub mod gui_indicators;
 pub mod gui_misc;
 pub mod immediate_mesh;
