@@ -1,6 +1,7 @@
 //! Server-layer data and enums, ported without the rendering backends.
 
 pub mod audio_bus;
+pub mod audio_capture;
 pub mod audio_effect_chorus;
 pub mod audio_effect_delay;
 pub mod audio_effect_distortion;
