@@ -17,6 +17,7 @@ pub mod packed_data_container;
 pub mod json_native;
 pub mod path_utils;
 pub mod plist;
+pub mod plist_binary;
 pub mod resource_loader;
 pub mod resource_saver;
 pub mod resource_uid;
