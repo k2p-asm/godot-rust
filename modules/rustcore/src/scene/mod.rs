@@ -20,6 +20,7 @@ pub mod media_resources;
 pub mod audio_players;
 pub mod audio_stream_polyphonic;
 pub mod bone_attachment_3d;
+pub mod bone_constraint_3d;
 pub mod bone_map;
 pub mod box_container;
 pub mod camera_3d;
