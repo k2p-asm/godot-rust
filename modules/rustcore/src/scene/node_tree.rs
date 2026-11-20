@@ -18,6 +18,7 @@ pub struct NodeTree {
     parents: HashMap<u64, u64>,
     children: HashMap<u64, Vec<u64>>,
     next_id: u64,
+    pending_delete: Vec<u64>,
 }
 
 impl NodeTree {
@@ -175,6 +176,59 @@ impl NodeTree {
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
+
+    pub fn contains_node(&self, id: u64) -> bool {
+        self.nodes.contains_key(&id)
+    }
+
+    /// queue_free: the node stays alive until the queue is flushed.
+    pub fn queue_delete(&mut self, id: u64) -> bool {
+        if !self.nodes.contains_key(&id) {
+            return false;
+        }
+        if !self.pending_delete.contains(&id) {
+            self.pending_delete.push(id);
+        }
+        true
+    }
+
+    pub fn is_queued_for_deletion(&self, id: u64) -> bool {
+        self.pending_delete.contains(&id)
+    }
+
+    pub fn pending_delete_count(&self) -> usize {
+        self.pending_delete.len()
+    }
+
+    /// Removes every queued node and its descendants. Returns how many nodes
+    /// were removed.
+    pub fn flush_deletes(&mut self) -> usize {
+        let queued = std::mem::take(&mut self.pending_delete);
+        let mut removed = 0;
+        for id in queued {
+            removed += self.remove_subtree(id);
+        }
+        removed
+    }
+
+    fn remove_subtree(&mut self, id: u64) -> usize {
+        if !self.nodes.contains_key(&id) {
+            return 0;
+        }
+        let children = self.children.get(&id).cloned().unwrap_or_default();
+        let mut removed = 0;
+        for c in children {
+            removed += self.remove_subtree(c);
+        }
+        if let Some(parent) = self.parents.remove(&id) {
+            if let Some(list) = self.children.get_mut(&parent) {
+                list.retain(|c| *c != id);
+            }
+        }
+        self.children.remove(&id);
+        self.nodes.remove(&id);
+        removed + 1
+    }
 }
 
 #[cfg(test)]
@@ -255,5 +309,38 @@ mod tests {
         let first = t.add_node(Some(root), "Twin").unwrap();
         let _second = t.add_node(Some(root), "Twin").unwrap();
         assert_eq!(t.resolve_path(root, "Twin"), Some(first));
+    }
+
+    #[test]
+    fn deferred_deletion_removes_subtrees_on_flush() {
+        let (mut t, root, player) = tree();
+        let a = t.add_node(Some(player), "A").unwrap();
+        let b = t.add_node(Some(a), "B").unwrap();
+
+        assert!(t.queue_delete(a));
+        assert!(t.is_queued_for_deletion(a));
+        // Still alive until the flush.
+        assert!(t.get_node(a).is_some());
+        assert!(t.get_node(b).is_some());
+
+        let removed = t.flush_deletes();
+        assert_eq!(removed, 2, "A and its child B");
+        assert!(t.get_node(a).is_none());
+        assert!(t.get_node(b).is_none());
+        assert_eq!(t.get_child_count(player), 0);
+        assert_eq!(t.get_child_count(root), 1);
+        assert!(!t.is_queued_for_deletion(a));
+
+        // Flushing again is a no-op.
+        assert_eq!(t.flush_deletes(), 0);
+    }
+
+    #[test]
+    fn queueing_twice_and_unknown_nodes() {
+        let (mut t, _root, player) = tree();
+        assert!(t.queue_delete(player));
+        assert!(t.queue_delete(player));
+        assert_eq!(t.pending_delete_count(), 1);
+        assert!(!t.queue_delete(999_999));
     }
 }

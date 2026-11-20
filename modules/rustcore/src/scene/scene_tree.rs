@@ -130,6 +130,23 @@ impl SceneTreeData {
         }
     }
 
+    /// `queue_free` plus the frame-end flush: the node and its descendants are
+    /// removed from the tree and from every group.
+    pub fn queue_free(&mut self, node: u64) -> bool {
+        self.tree.queue_delete(node)
+    }
+
+    pub fn flush_delete_queue(&mut self) -> usize {
+        let removed = self.tree.flush_deletes();
+        if removed > 0 {
+            for list in self.groups.values_mut() {
+                list.retain(|n| self.tree.contains_node(*n));
+            }
+            self.groups.retain(|_, l| !l.is_empty());
+        }
+        removed
+    }
+
     /// Advances the frame counter (the loop itself is not ported).
     pub fn process_frame(&mut self) {
         self.process_frames += 1;
@@ -213,6 +230,26 @@ mod tests {
         assert!(!st.can_process(n));
         st.set_paused(true);
         assert!(st.can_process(n));
+    }
+
+    #[test]
+    fn queue_free_removes_nodes_and_group_entries() {
+        let mut st = SceneTreeData::new();
+        let root = st.get_root();
+        let a = st.tree.add_node(Some(root), "A").unwrap();
+        let b = st.tree.add_node(Some(a), "B").unwrap();
+        st.add_to_group(a, "g");
+        st.add_to_group(b, "g");
+        st.add_to_group(root, "g");
+
+        assert!(st.queue_free(a));
+        // Membership survives until the flush.
+        assert!(st.is_in_group(a, "g"));
+        assert_eq!(st.flush_delete_queue(), 2);
+        assert!(!st.is_in_group(a, "g"));
+        assert!(!st.is_in_group(b, "g"));
+        assert!(st.is_in_group(root, "g"));
+        assert_eq!(st.get_nodes_in_group("g"), vec![root]);
     }
 
     #[test]
