@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **813 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **819 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -170,6 +170,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/color_names.rs` | `core/math/color_names.inc` | 146 `(NAME, 0xRRGGBBAA)` pairs from `tools/gen_color_names.py`, cross-checked with an independent C++ parser |
 | `string/gstring.rs` | `core/string/ustring.h/.cpp` (start) | COW buffer (`Arc::make_mut`), append/find/rfind/substr/begins_with/ends_with/strip_edges/split/replace/count/join/to_int/is_valid_int/to_float/is_valid_float/insert/repeat/find_char/pad_decimals/pad_zeros/lpad/rpad/trim_prefix/trim_suffix/quote/unquote/is_quoted/is_lowercase/is_uppercase/path helpers (get_file, get_extension, get_basename, path_join, is_absolute_path), ASCII + Unicode case mapping (`to_upper`/`to_lower`, locale-independent, non-differential), Murmur3 `hash()`. UTF-8/UTF-16 encode/decode with surrogate and U+10FFFF boundary tests (not differential: `ustring.cpp` cannot be linked in the harness). `String::num` pending |
 | `object/mod.rs` | `core/object/object.h`, `ref_counted.*` | `ObjectId` (unique, never reused, `is_valid`), `Object` lifetime registry, `RefCounted` ref/unref that destroys at zero. **Non-differential** |
+| `scene/virtual_joystick.rs` | `scene/gui/virtual_joystick.*` (state + stick math) | Three joystick modes, sizes, deadzone/clamp ratios, offset ratio, the four action names, visibility mode, plus `_update_joystick` ported exactly: following-mode base drag gated by `has_point`, radius clamp, `offset/radius` raw vector, deadzone rescale through `inverse_lerp` and the one-shot `flick_canceled` transition. `Input` calls and drawing not ported. **Non-differential** |
 | `scene/texture_progress_bar.rs` | `scene/gui/texture_progress_bar.*` (state) | Nine fill modes with the `FILL_MODE_MAX`/negative rejection, progress and radial offsets, initial angle/fill degrees, three textures, nine-patch stretch with side-validated margins and the three tints. Drawing not ported. **Non-differential** |
 | `scene/label.rs` | `scene/gui/label.*` (state) | Paragraph separator `"\n"`-as-two-chars, language/direction/structured-text parser, visible-character behaviour, the count↔ratio coupling (`-1`/empty means full, truncating), negative line skip rejection and the line limit/tab stops. Shaping and drawing not ported. **Non-differential** |
 | `scene/material_extras.rs` | `scene/resources/3d/fog_material.*`, `scene/resources/blit_material.*` | FogMaterial (density 1, white albedo, opaque-black emission from the constructor, height falloff, edge fade 0.1, density texture) and BlitMaterial's five blend modes. Shader selection not ported. **Non-differential** |

@@ -93,5 +93,6 @@ pub mod velocity_tracker_3d;
 pub mod visible_on_screen_notifier_2d;
 pub mod visible_on_screen_notifier_3d;
 pub mod world_environment;
+pub mod virtual_joystick;
 pub mod visual_instance_3d;
 pub mod volumes_3d;
