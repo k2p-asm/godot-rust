@@ -21,6 +21,7 @@ pub mod grid_container;
 pub mod gui_indicators;
 pub mod gui_misc;
 pub mod light_2d;
+pub mod light_occluder_2d;
 pub mod line_2d;
 pub mod canvas_layer;
 pub mod margin_center;
