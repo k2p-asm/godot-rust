@@ -4,6 +4,7 @@ pub mod config_file;
 pub mod ip_address;
 pub mod json;
 pub mod logger;
+pub mod marshalls;
 pub mod json_native;
 pub mod path_utils;
 pub mod plist;
