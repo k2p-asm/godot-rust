@@ -7,6 +7,7 @@ pub mod camera_2d;
 pub mod animation;
 pub mod animation_mixer;
 pub mod animation_player;
+pub mod box_container;
 pub mod canvas_item;
 pub mod control;
 pub mod curve;
