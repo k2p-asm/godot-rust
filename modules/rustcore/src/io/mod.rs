@@ -7,6 +7,7 @@ pub mod file_access_std;
 pub mod file_access_helpers;
 pub mod file_access_memory;
 pub mod http_client;
+pub mod http_client_tcp;
 pub mod ip_address;
 pub mod json;
 pub mod logger;
