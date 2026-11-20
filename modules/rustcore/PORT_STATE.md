@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **517 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **525 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -193,6 +193,8 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/geometry_2d.rs` | `core/math/geometry_2d.h` | hit tests + `vec2_cross`, `convex_hull` (verified: 5 points, first repeated), `bresenham_line` (verified) |
 | `ffi.rs` | (new) | `gcr_variant_nil/bool/int/float/vector3`, `gcr_variant_type/as_int/as_float/as_vector3/booleanize`; verified inside the engine build (prints `variant tag = 2, truthy = 1` and `Rust packed sum = 256`) | **old**: C ABI: `gcr_abi_version`, `gcr_vector3_dot`, `gcr_vector3_normalized`, `gcr_transform3d_xform` |
 | `templates/hashfuncs.rs` | `core/templates/hashfuncs.*` | complete |
+| `servers/audio_effect_{reverb,delay,chorus,distortion,eq,filter,misc}.rs` | `servers/audio/effects/audio_effect_*.{h,cpp}` | Parameter state for every effect class: Reverb, Delay, Chorus, Distortion, EQ6/10/21, the five filters, Limiter, Amplify, Panner, StereoEnhance, Compressor and PitchShift. Defaults copied from each constructor or in-class initialiser; setters replicate the C++ validation (EQ band index, chorus voice index/count, pitch scale `> 0`, oversampling `>= 4`, FFT size `< MAX`, reverb feedback `0..0.98`) and never clamp where the engine does not. `Amplify` converts through `linear_to_db`/`db_to_linear`. DSP/`process()` is not ported. **Non-differential** (`AudioEffect` is `Resource`-backed) |
+| `servers/audio_bus.rs` | `servers/audio/audio_bus_layout.*` (state) | Master bus that cannot be removed, add/remove with send reindexing, volume/mute/solo/bypass, validated send targets, and `is_bus_active` with the engine's solo rule. Mixing not ported. **Non-differential** |
 
 ## Deliberately not translated
 
