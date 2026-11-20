@@ -58,6 +58,7 @@ pub mod gpu_particles_collision;
 pub mod kinematic_collision;
 pub mod primitive_meshes;
 pub mod worlds;
+pub mod sprite_3d;
 pub mod spring_arm_3d;
 pub mod spring_bone_collision;
 pub mod spring_bone_simulator_3d;
