@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **277 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **285 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -147,7 +147,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/node_2d.rs` | `scene/2d/node_2d.*` (data half) | position/rotation/scale/skew with the engine's lazy decomposition of `set_transform`, zero-scale clamp, `rotate`/`translate`, relative transform. `set_rotation_scale_and_skew` is differential (`t2.rs_skew*`). Parenting and notifications need the object layer |
 | `scene/canvas_item.rs` | `scene/main/canvas_item.*` (data half) | visibility with the cached `parent_visible_in_tree`, `modulate`/`self_modulate` + ancestor composition, `z_index` range check (`-4096..=4096`) and relative composition, `y_sort_enabled`, `show_behind_parent`, clip mode, light/visibility layers |
 | `scene/node.rs` | `scene/main/node.*` (data half) | name/owner, unique-name flag, `ProcessMode` (inherit/pausable/when-paused/always/disabled) with the engine resolution and `can_process` matrix, process/physics priorities, thread group, `inside_tree`, and the eight `set_process*` flags. **Non-differential** (needs the tree/object layer) |
-| `scene/curve.rs` | `scene/resources/curve.*` (1D core) | ordered points clamped to the value/domain ranges, lower-bound `get_index`, cubic Bézier `sample` with the engine's one-third control points, auto (linear) tangents, bake cache and `sample_baked`. Curve2D/3D not ported. **Non-differential** (`Resource` pulls `ClassDB`) |\n| `scene/canvas_layer.rs` | `scene/main/canvas_layer.*` (data half) | `layer`, offset/rotation/scale with the engine's lazy decomposition after `set_transform`, visibility, follow-viewport transform composition (`vp * scale(ratio) * layer`). `set_rotation_and_scale` is differential (`t2.rot_scale*`) |
+| `scene/curve_2d.rs` | `scene/resources/curve.*` (Curve2D core) | points with in/out controls, cubic Bézier `sample`/`samplef`, even-length tessellation (depth 10, `bake_interval` 5.0), cumulative arc lengths, `sample_baked` (linear and cubic) with clamping. Tilts/posture and Curve3D not ported. **Non-differential** |\n| `scene/curve.rs` | `scene/resources/curve.*` (1D core) | ordered points clamped to the value/domain ranges, lower-bound `get_index`, cubic Bézier `sample` with the engine's one-third control points, auto (linear) tangents, bake cache and `sample_baked`. Curve2D/3D not ported. **Non-differential** (`Resource` pulls `ClassDB`) |\n| `scene/canvas_layer.rs` | `scene/main/canvas_layer.*` (data half) | `layer`, offset/rotation/scale with the engine's lazy decomposition after `set_transform`, visibility, follow-viewport transform composition (`vp * scale(ratio) * layer`). `set_rotation_and_scale` is differential (`t2.rot_scale*`) |
 | `math/vector4.rs` | `core/math/vector4.*` | complete (`Vector4i` pending) |
 | `math/face3.rs` | `core/math/face3.*` | plane/area/aabb/split_by_plane, exact `get_closest_point_to`, SAT `intersects_aabb` (verified). ray/segment via `geometry_3d`, support + project_range (all verified) |
 | `math/vector4i.rs` | `core/math/vector4i.*` | core, `clamp`/`clampi`, `snapped`/`snappedi` (verified), `min`/`max_axis_index` |
