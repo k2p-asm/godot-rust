@@ -9,6 +9,7 @@ pub mod animation_library;
 pub mod aspect_ratio_container;
 pub mod animation_mixer;
 pub mod animation_player;
+pub mod base_button;
 pub mod bit_map;
 pub mod audio_listener_3d;
 pub mod audio_stream_polyphonic;
