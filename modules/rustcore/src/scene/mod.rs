@@ -27,6 +27,8 @@ pub mod control;
 pub mod voxel_gi;
 pub mod graph_edit;
 pub mod graph_node;
+pub mod color_picker;
+pub mod graph_frame;
 pub mod touch_button;
 pub mod soft_body_3d;
 pub mod vehicle_nodes;
