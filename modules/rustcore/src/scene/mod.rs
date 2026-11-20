@@ -13,6 +13,7 @@ pub mod bit_map;
 pub mod box_container;
 pub mod camera_attributes;
 pub mod canvas_item;
+pub mod canvas_item_material;
 pub mod control;
 pub mod curve;
 pub mod curve_2d;
