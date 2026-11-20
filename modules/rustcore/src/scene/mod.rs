@@ -19,3 +19,4 @@ pub mod sprite_2d;
 pub mod sprite_frames;
 pub mod tile_map_layer;
 pub mod tile_set;
+pub mod timer;
