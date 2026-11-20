@@ -24,6 +24,7 @@ pub mod canvas_layer;
 pub mod margin_center;
 pub mod node;
 pub mod polygon_2d;
+pub mod range;
 pub mod scene_tree;
 pub mod shapes_2d;
 pub mod scroll_container;
