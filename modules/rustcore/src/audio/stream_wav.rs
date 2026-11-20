@@ -388,6 +388,62 @@ impl AudioStreamWav {
                 .collect(),
         }
     }
+
+    /// `save_to_wav`: the RIFF file bytes (`Error::OK` equivalent is the byte
+    /// vector; the engine's file write is not needed here).
+    ///
+    /// The engine's header layout is reproduced exactly: `RIFF` + 36 + data
+    /// bytes, `fmt ` of 16 bytes, the format code (1, or 3 for IMA-ADPCM), the
+    /// channel count, rate, byte rate and block align.
+    ///
+    /// Two engine quirks are preserved: IMA-ADPCM reports its format code and
+    /// byte-aligned sizes but writes no sample data, and QOA is written as
+    /// 16-bit PCM. The engine adds 128 to 8-bit samples because it stores them
+    /// signed; this port's loader stores them unsigned, so they are written
+    /// unchanged to keep the round trip exact.
+    pub fn to_wav_bytes(&self) -> Vec<u8> {
+        let data_bytes = self.data.len();
+        let format_code: u16 = if self.format == WavFormat::FormatImaAdpcm {
+            3
+        } else {
+            1
+        };
+        let channels: u16 = if self.stereo { 2 } else { 1 };
+        let byte_pr_sample: u32 = match self.format {
+            WavFormat::Format8Bits => 1,
+            WavFormat::Format16Bits | WavFormat::FormatQoa => 2,
+            WavFormat::FormatImaAdpcm => 4,
+        };
+        let rate = self.mix_rate as u32;
+
+        let mut out = Vec::with_capacity(data_bytes + 44);
+        out.extend_from_slice(b"RIFF");
+        out.extend_from_slice(&(data_bytes as u32).wrapping_add(36).to_le_bytes());
+        out.extend_from_slice(b"WAVE");
+        out.extend_from_slice(b"fmt ");
+        out.extend_from_slice(&16u32.to_le_bytes());
+        out.extend_from_slice(&format_code.to_le_bytes());
+        out.extend_from_slice(&channels.to_le_bytes());
+        out.extend_from_slice(&rate.to_le_bytes());
+        out.extend_from_slice(&(rate * channels as u32 * byte_pr_sample).to_le_bytes());
+        let block_align = (channels as u32 * byte_pr_sample) as u16;
+        out.extend_from_slice(&block_align.to_le_bytes());
+        out.extend_from_slice(&(byte_pr_sample as u16 * 8).to_le_bytes());
+        out.extend_from_slice(b"data");
+        out.extend_from_slice(&(data_bytes as u32).to_le_bytes());
+
+        match self.format {
+            WavFormat::Format8Bits => out.extend_from_slice(&self.data),
+            WavFormat::Format16Bits | WavFormat::FormatQoa => {
+                for pair in self.data.chunks_exact(2) {
+                    out.extend_from_slice(&u16::from_le_bytes([pair[0], pair[1]]).to_le_bytes());
+                }
+            }
+            // The engine leaves IMA-ADPCM sample data unimplemented.
+            WavFormat::FormatImaAdpcm => {}
+        }
+        out
+    }
 }
 
 #[cfg(test)]
@@ -604,5 +660,71 @@ mod tests {
         assert_eq!(wav.get_tags().len(), 1);
         assert_eq!(WavFormat::Format8Bits as i32, 0);
         assert_eq!(LoopMode::Backward as i32, 3);
+    }
+
+    #[test]
+    fn save_round_trips_pcm() {
+        // 16-bit stereo: the header is the engine's layout and the payload is
+        // the stored little-endian samples.
+        let mut wav = AudioStreamWav::new();
+        wav.set_mix_rate(22050);
+        wav.set_stereo(true);
+        // Two complete stereo frames (the loader drops partial frames).
+        wav.set_data(vec![0, 0, 0x00, 0x40, 0x00, 0xC0, 0x00, 0x20]);
+        let bytes = wav.to_wav_bytes();
+        assert_eq!(&bytes[0..4], b"RIFF");
+        assert_eq!(&bytes[8..12], b"WAVE");
+        assert_eq!(&bytes[12..16], b"fmt ");
+        assert_eq!(&bytes[20..22], &1u16.to_le_bytes(), "PCM format code");
+        assert_eq!(&bytes[22..24], &2u16.to_le_bytes(), "stereo");
+        assert_eq!(&bytes[24..28], &22050u32.to_le_bytes());
+        assert_eq!(&bytes[28..32], &(22050u32 * 2 * 2).to_le_bytes());
+        assert_eq!(&bytes[32..34], &4u16.to_le_bytes(), "block align");
+        assert_eq!(&bytes[34..36], &16u16.to_le_bytes(), "bits per sample");
+        assert_eq!(&bytes[36..40], b"data");
+        assert_eq!(&bytes[40..44], &8u32.to_le_bytes());
+        assert_eq!(&bytes[44..], &[0, 0, 0x00, 0x40, 0x00, 0xC0, 0x00, 0x20]);
+        assert_eq!(&bytes[4..8], &44u32.to_le_bytes(), "36 + data bytes");
+
+        let parsed = AudioStreamWav::load_from_buffer(&bytes).expect("re-parsed");
+        assert_eq!(parsed.get_mix_rate(), 22050);
+        assert!(parsed.is_stereo());
+        assert_eq!(parsed.get_data(), wav.get_data());
+
+        // 8-bit data is written unchanged (the port's unsigned storage).
+        let mut eight = AudioStreamWav::new();
+        eight.set_format(WavFormat::Format8Bits);
+        eight.set_mix_rate(8000);
+        eight.set_data(vec![0, 128, 255]);
+        let bytes = eight.to_wav_bytes();
+        assert_eq!(&bytes[34..36], &8u16.to_le_bytes());
+        assert_eq!(&bytes[44..], &[0, 128, 255]);
+        let parsed = AudioStreamWav::load_from_buffer(&bytes).expect("re-parsed");
+        assert_eq!(parsed.get_format(), WavFormat::Format8Bits);
+        assert_eq!(parsed.get_data(), eight.get_data());
+    }
+
+    #[test]
+    fn save_quirks_for_compressed_formats() {
+        // IMA-ADPCM: format code 3 and 4 bytes per sample in the header, but the
+        // engine writes no payload.
+        let mut wav = AudioStreamWav::new();
+        wav.set_format(WavFormat::FormatImaAdpcm);
+        wav.set_data(vec![1, 2, 3, 4]);
+        let bytes = wav.to_wav_bytes();
+        assert_eq!(&bytes[20..22], &3u16.to_le_bytes());
+        assert_eq!(&bytes[28..32], &(44100u32 * 4).to_le_bytes());
+        assert_eq!(&bytes[32..34], &4u16.to_le_bytes());
+        assert_eq!(&bytes[34..36], &32u16.to_le_bytes());
+        assert_eq!(&bytes[40..44], &4u32.to_le_bytes());
+        assert_eq!(bytes.len(), 44, "no sample data is written");
+
+        // QOA is written as 16-bit PCM.
+        let mut qoa = AudioStreamWav::new();
+        qoa.set_format(WavFormat::FormatQoa);
+        qoa.set_data(vec![0x34, 0x12, 0x78, 0x56]);
+        let bytes = qoa.to_wav_bytes();
+        assert_eq!(&bytes[34..36], &16u16.to_le_bytes());
+        assert_eq!(&bytes[44..], &[0x34, 0x12, 0x78, 0x56]);
     }
 }
