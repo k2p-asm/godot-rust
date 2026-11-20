@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1409 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1414 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -197,6 +197,7 @@ um_int64`/
 um_uint64`) | bases 2-36, INT64_MIN, u64::MAX; plus 
 um_float` (fixed decimals, zero trimming, `-0.0`, inf/nan, 16-decimal cap, half-to-even rounding). **Non-differential** (see note 3) |
 | `math/fieldwise.rs` | `core/math/math_fieldwise.cpp` | `fieldwise_assign` over 14 variant types (Vector2..Transform3D), type-mismatch and unknown-field no-ops. **Non-differential** (engine code is `#ifdef DEBUG_ENABLED`) |
+| `audio/eq_filter.rs` | `servers/audio/effects/eq_filter.*`, `servers/audio/effects/audio_effect_eq.*` | The EQ: per-band biquad sections from the logarithmic octave bands (quadratic root solving, `SQRT12 = sqrt(1/2)` so `side_gain2 = 0.5`), the 6/8/10/21/31-band presets, custom band sets, mix-rate recalculation, `BandProcess::process_one` with its history, and the two-bank `AudioEffectEQ` summing band outputs scaled by the dB gains. Tests cover preset frequencies/counts, finite coefficients across all presets, the band process history, bank reconstruction of a 1 kHz tone and muted-band silence. **Non-differential** |
 | `audio/effects_reverb.rs` | `servers/audio/effects/reverb_filter.*`, `servers/audio/effects/audio_effect_reverb.*` | The Freeverb-derived reverb: 8 damped combs, 4 all-pass stages (feedback 0.7), pre-delay echo with feedback, input high-pass, room-size feedback law, damp coefficient, spread-limited buffer lengths, the `wet*0.6 + dry` mix, and the two-channel wrapper (right channel extra spread `0.000521`) with 1024-frame chunking. Tests cover defaults/clamps, exact buffer sizes, dry transparency, a decaying wet tail and stereo spread. **Non-differential** |
 | `audio/effects_compressor.rs` | `servers/audio/effects/audio_effect_compressor.*` | The compressor: peak follower, dB attack/release envelope, smoothed ratio with its own attack/release coefficients, the gain computer (`-overdb * (ratio - 1) / ratio`), makeup gain, dry/wet mix and the gain-reduction meter with its decay. The sidechain bus lookup is not ported. Tests cover defaults/accessors, below-threshold transparency, over-threshold attenuation, makeup gain and mix blending. **Non-differential** |
 | `audio/effects_stereo_enhance.rs` | `servers/audio/effects/audio_effect_stereo_enhance.*` | Pan pull-out towards the centre, the delayed right channel, the surround mode adding/subtracting the delayed mid, and the engine's next-power-of-two ring sizing from `MAX_DELAY_MS + 2`. Tests cover defaults, ring sizes, full-pullout identity, pull-out mixing, right-channel delay and surround. **Non-differential** |
