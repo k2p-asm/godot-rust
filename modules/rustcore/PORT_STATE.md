@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **713 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **717 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -208,6 +208,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/gui_indicators.rs` | `scene/gui/{scroll_bar,slider,progress_bar}.*` (state) | ScrollBar step 0/custom step/smooth scroll; Slider ticks, position, editable and scrollable; ProgressBar step 0.01, percentage/indeterminate flags and fill modes with `FILL_MODE_MAX` rejection. **Non-differential** |
 | `scene/bit_map.rs` | `scene/resources/bit_map.*` (grid half) | Packed bits with create limits, checked set/get, clipped rect fill, popcount, nearest-neighbour resize, circular grow/shrink masks with rect clipping, and blit. Image import/export and marching squares not ported. **Non-differential** |
 | `scene/light_occluder_2d.rs` | `scene/2d/light_occluder_2d.*` | OccluderPolygon2D vertices/closed/cull mode and LightOccluder2D polygon reference, light mask and SDF flag. RIDs/SDF generation not ported. **Non-differential** |
+| `io/json_native.rs` | `core/io/json.*` (`from_native`/`to_native`) | Scalar prefixes, untyped arrays, dictionaries wrapped with key/value pairs like the engine, and Vector2/2i, Rect2/2i, Vector3/3i, Transform2D, Vector4/4i, Plane, Quaternion, AABB, Basis, Transform3D, Projection, Color in engine argument order. Typed containers, resource serialization and real RID/Callable/Signal payloads not ported (type-only dicts decode to Nil). **Non-differential** |
 | `io/json.rs` | `core/io/json.*` (parse/stringify) | Engine token rules (floats for all numbers), full string escapes incl. surrogate pairs, exact error messages/lines, 1024 depth cap; stringify with sorted keys, optional indent, 14-magnitude fixed precision, `0.0`/inf/NaN handling and JSON escaping. Native conversions not ported. **Non-differential** |
 | `scene/panel_container.rs` | `scene/gui/panel_container.*` (layout) | Minimum `child + stylebox` and child cell `Rect2(offset, size - style_min)` with the child's flags via `Control::layout_in_cell`. Theme lookup not ported. **Non-differential** |
 | `scene/label_settings.rs` | `scene/resources/label_settings.*` | Line/paragraph spacing, font handle, size 16, colours, shadow defaults and the ordered stacked outline/shadow lists with the engine's add/move/remove/count/validation rules. Text layout not ported. **Non-differential** |
