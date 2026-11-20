@@ -8,6 +8,7 @@ pub mod animation;
 pub mod animation_library;
 pub mod animation_mixer;
 pub mod animation_player;
+pub mod bit_map;
 pub mod box_container;
 pub mod canvas_item;
 pub mod control;
