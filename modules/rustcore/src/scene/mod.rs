@@ -42,6 +42,7 @@ pub mod material;
 pub mod mesh_instance_2d;
 pub mod mesh_instance_3d;
 pub mod mesh_library;
+pub mod multimesh;
 pub mod multimesh_instance_3d;
 pub mod node;
 pub mod placeholder_3d;

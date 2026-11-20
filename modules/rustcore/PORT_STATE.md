@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **736 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **739 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -227,6 +227,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/compositor.rs` | `scene/resources/compositor.*` | CompositorEffect defaults (enabled, post-transparent stage, four access flags) and the ordered effect list. Render callbacks/RIDs not ported. **Non-differential** |
 | `scene/shader.rs` | `scene/resources/shader.*` | Mode enum (6 modes + Max), code/include path, and indexed default textures where null at index 0 erases the parameter while other indices keep a null entry. Compilation/uniforms/RID not ported. **Non-differential** |
 | `scene/material.rs` | `scene/resources/material.*` (base + ShaderMaterial) | Next pass, render priority validated to -128..=127, shader handle and a parameter map where `Nil` erases; sorted parameter list. RenderingServer side not ported. **Non-differential** |
+| `scene/skeleton_3d.rs` | `scene/3d/skeleton_3d.*` (core) | Bone add/clear/rename with the engine's name rules, parent validation/ancestry, rests, pose position/rotation/scale, global rest/pose composition with cycle guards, global-pose setting, reset and show-rest-only. Dirty caches/skins/modifiers/overrides not ported. **Non-differential** |
 | `scene/skeleton_profile.rs` | `scene/resources/skeleton_profile.*` | Group/bone metadata with resize retention, per-index accessors/defaults, find/has bone (empty name never found) and the read-only flag blocking mutations. **Non-differential** |
 | `scene/mesh_instance_3d.rs` | `scene/3d/mesh_instance_3d.*` | Mesh/skin handles, skeleton path, blend-shape tracks with name lookup and index validation, and per-surface override materials. **Non-differential** |
 | `scene/importer_mesh_instance_3d.rs` | `scene/3d/importer_mesh_instance_3d.*` | Importer mesh/skin/path, growing surface material list with negative rejection, layer mask, shadow setting and visibility range/fade. **Non-differential** |
