@@ -292,6 +292,87 @@ impl PanoramaSkyMaterialData {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct PhysicalSkyMaterialData {
+    rayleigh: f32,
+    rayleigh_color: Color,
+    mie: f32,
+    mie_eccentricity: f32,
+    mie_color: Color,
+    turbidity: f32,
+    sun_disk_scale: f32,
+    ground_color: Color,
+    energy_multiplier: f32,
+    use_debanding: bool,
+    night_sky: Option<Rid>,
+}
+
+impl Default for PhysicalSkyMaterialData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PhysicalSkyMaterialData {
+    pub fn new() -> Self {
+        Self {
+            rayleigh: 2.0,
+            rayleigh_color: Color::new(0.3, 0.405, 0.6, 1.0),
+            mie: 0.005,
+            mie_eccentricity: 0.8,
+            mie_color: Color::new(0.69, 0.729, 0.812, 1.0),
+            turbidity: 10.0,
+            sun_disk_scale: 1.0,
+            ground_color: Color::new(0.1, 0.07, 0.034, 1.0),
+            energy_multiplier: 1.0,
+            use_debanding: true,
+            night_sky: None,
+        }
+    }
+
+    sky_accessors!(
+        rayleigh,
+        set_rayleigh_coefficient,
+        get_rayleigh_coefficient,
+        f32
+    );
+    sky_accessors!(
+        rayleigh_color,
+        set_rayleigh_color,
+        get_rayleigh_color,
+        Color
+    );
+    sky_accessors!(mie, set_mie_coefficient, get_mie_coefficient, f32);
+    sky_accessors!(
+        mie_eccentricity,
+        set_mie_eccentricity,
+        get_mie_eccentricity,
+        f32
+    );
+    sky_accessors!(mie_color, set_mie_color, get_mie_color, Color);
+    sky_accessors!(turbidity, set_turbidity, get_turbidity, f32);
+    sky_accessors!(
+        sun_disk_scale,
+        set_sun_disk_scale,
+        get_sun_disk_scale,
+        f32
+    );
+    sky_accessors!(ground_color, set_ground_color, get_ground_color, Color);
+    sky_accessors!(
+        energy_multiplier,
+        set_energy_multiplier,
+        get_energy_multiplier,
+        f32
+    );
+    sky_accessors!(
+        use_debanding,
+        set_use_debanding,
+        get_use_debanding,
+        bool
+    );
+    sky_accessors!(night_sky, set_night_sky, get_night_sky, Option<Rid>);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -392,8 +473,7 @@ mod tests {
     }
 
     #[test]
-    fn panorama_defaults_and_setters() {
-        let mut p = PanoramaSkyMaterialData::new();
+    fn panorama_defaults_and_setters() {        let mut p = PanoramaSkyMaterialData::new();
         assert!(p.get_panorama().is_none());
         assert_eq!(p.get_energy_multiplier(), 1.0);
         assert!(p.is_filtering_enabled());
@@ -407,5 +487,45 @@ mod tests {
 
         p.set_panorama(None);
         assert!(p.get_panorama().is_none());
+    }
+
+    #[test]
+    fn physical_defaults_and_setters() {
+        let mut p = PhysicalSkyMaterialData::new();
+        assert_eq!(p.get_rayleigh_coefficient(), 2.0);
+        assert_eq!(p.get_rayleigh_color(), Color::new(0.3, 0.405, 0.6, 1.0));
+        assert_eq!(p.get_mie_coefficient(), 0.005);
+        assert_eq!(p.get_mie_eccentricity(), 0.8);
+        assert_eq!(p.get_mie_color(), Color::new(0.69, 0.729, 0.812, 1.0));
+        assert_eq!(p.get_turbidity(), 10.0);
+        assert_eq!(p.get_sun_disk_scale(), 1.0);
+        assert_eq!(p.get_ground_color(), Color::new(0.1, 0.07, 0.034, 1.0));
+        assert_eq!(p.get_energy_multiplier(), 1.0);
+        assert!(p.get_use_debanding());
+        assert!(p.get_night_sky().is_none());
+
+        p.set_rayleigh_coefficient(3.0);
+        p.set_rayleigh_color(Color::new(0.1, 0.1, 0.1, 1.0));
+        p.set_mie_coefficient(0.01);
+        p.set_mie_eccentricity(0.5);
+        p.set_mie_color(Color::new(0.5, 0.5, 0.5, 1.0));
+        p.set_turbidity(5.0);
+        p.set_sun_disk_scale(2.0);
+        p.set_ground_color(Color::new(0.0, 0.0, 0.0, 1.0));
+        p.set_energy_multiplier(2.0);
+        p.set_use_debanding(false);
+        p.set_night_sky(Some(Rid::from_u64(4)));
+
+        assert_eq!(p.get_rayleigh_coefficient(), 3.0);
+        assert_eq!(p.get_rayleigh_color(), Color::new(0.1, 0.1, 0.1, 1.0));
+        assert_eq!(p.get_mie_coefficient(), 0.01);
+        assert_eq!(p.get_mie_eccentricity(), 0.5);
+        assert_eq!(p.get_mie_color(), Color::new(0.5, 0.5, 0.5, 1.0));
+        assert_eq!(p.get_turbidity(), 5.0);
+        assert_eq!(p.get_sun_disk_scale(), 2.0);
+        assert_eq!(p.get_ground_color(), Color::new(0.0, 0.0, 0.0, 1.0));
+        assert_eq!(p.get_energy_multiplier(), 2.0);
+        assert!(!p.get_use_debanding());
+        assert_eq!(p.get_night_sky(), Some(Rid::from_u64(4)));
     }
 }
