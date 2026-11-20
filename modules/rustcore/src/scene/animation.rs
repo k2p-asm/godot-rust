@@ -8,6 +8,7 @@
 //! Not ported: position/rotation/scale/bezier/method/audio/animation tracks,
 //! compression, and the `Resource` plumbing.
 
+use crate::math::vector2::Vector2;
 use crate::string::string_name::StringName;
 use crate::variant::{Variant, VariantType};
 
@@ -69,14 +70,29 @@ pub struct MethodKey {
     pub params: Vec<Variant>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct BezierKey {
+    pub time: f64,
+    pub value: f32,
+    pub in_handle: crate::math::vector2::Vector2,
+    pub out_handle: crate::math::vector2::Vector2,
+}
+
 #[derive(Clone, Debug)]
 pub struct Track {
     pub track_type: TrackType,
     pub keys: Vec<TrackKey>,
     pub method_keys: Vec<MethodKey>,
+    pub bezier_keys: Vec<BezierKey>,
     pub interpolation: InterpolationType,
     pub loop_wrap: bool,
     pub path: StringName,
+}
+
+/// Cubic Bézier used by bezier tracks (control points, not Catmull-Rom).
+fn bezier2(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, t: f32) -> Vector2 {
+    let u = 1.0 - t;
+    p0 * (u * u * u) + p1 * (3.0 * u * u * t) + p2 * (3.0 * u * t * t) + p3 * (t * t * t)
 }
 
 pub struct Animation {
@@ -132,6 +148,7 @@ impl Animation {
             track_type,
             keys: Vec::new(),
             method_keys: Vec::new(),
+            bezier_keys: Vec::new(),
             interpolation: InterpolationType::Linear,
             loop_wrap: true,
             path: StringName::new(""),
@@ -529,6 +546,94 @@ impl Animation {
             .map(|k| k.time)
     }
 
+    pub fn bezier_track_insert_key(
+        &mut self,
+        track: usize,
+        time: f64,
+        value: f32,
+        in_handle: Vector2,
+        out_handle: Vector2,
+    ) -> Option<usize> {
+        let t = self.tracks.get_mut(track)?;
+        let key = BezierKey {
+            time,
+            value,
+            in_handle,
+            out_handle,
+        };
+        if let Some(idx) = t.bezier_keys.iter().position(|k| k.time == time) {
+            t.bezier_keys[idx] = key;
+            return Some(idx);
+        }
+        t.bezier_keys.push(key);
+        t.bezier_keys.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
+        t.bezier_keys.iter().position(|k| k.time == time)
+    }
+
+    pub fn bezier_track_get_key_count(&self, track: usize) -> usize {
+        self.tracks
+            .get(track)
+            .map(|t| t.bezier_keys.len())
+            .unwrap_or(0)
+    }
+
+    pub fn bezier_track_get_key(&self, track: usize, key: usize) -> Option<BezierKey> {
+        self.tracks.get(track)?.bezier_keys.get(key).copied()
+    }
+
+    /// `bezier_track_interpolate`: solves the segment's x for the requested time
+    /// by bisection (10 iterations, like the engine) and returns the y.
+    pub fn bezier_track_interpolate(&self, track: usize, time: f64) -> Option<f32> {
+        let t = self.tracks.get(track)?;
+        if t.bezier_keys.is_empty() {
+            return None;
+        }
+        if time <= t.bezier_keys[0].time {
+            return Some(t.bezier_keys[0].value);
+        }
+        let last = t.bezier_keys.len() - 1;
+        if time >= t.bezier_keys[last].time {
+            return Some(t.bezier_keys[last].value);
+        }
+
+        let mut idx = 0usize;
+        while idx + 1 < t.bezier_keys.len() && t.bezier_keys[idx + 1].time <= time {
+            idx += 1;
+        }
+        let a = t.bezier_keys[idx];
+        let b = t.bezier_keys[idx + 1];
+
+        let duration = (b.time - a.time) as f32;
+        let elapsed = (time - a.time) as f32;
+
+        let start = Vector2::new(0.0, a.value);
+        let start_out = start + a.out_handle;
+        let end = Vector2::new(duration, b.value);
+        let end_in = end + b.in_handle;
+
+        let mut low = 0.0f32;
+        let mut high = 1.0f32;
+        for _ in 0..10 {
+            let middle = (low + high) / 2.0;
+            let interp = bezier2(start, start_out, end_in, end, middle);
+            if interp.x < elapsed {
+                low = middle;
+            } else {
+                high = middle;
+            }
+        }
+
+        let low_pos = bezier2(start, start_out, end_in, end, low);
+        let high_pos = bezier2(start, start_out, end_in, end, high);
+        let denom = high_pos.x - low_pos.x;
+        let c = if denom != 0.0 {
+            (elapsed - low_pos.x) / denom
+        } else {
+            0.0
+        };
+        Some(low_pos.y + (high_pos.y - low_pos.y) * c)
+    }
+
     /// Numeric value type check used by the interpolator above.
     pub fn track_is_numeric(&self, track: usize) -> bool {
         match self.tracks.get(track) {
@@ -719,6 +824,52 @@ mod tests {
         );
         assert_eq!(a.method_track_get_key_count(t), 3);
         assert_eq!(a.method_track_get_key(t, 1).unwrap().1, &[Variant::Int(9)]);
+    }
+
+    #[test]
+    fn bezier_track_interpolates_with_solved_x() {
+        use crate::math::vector2::Vector2 as V2;
+        let mut a = Animation::new();
+        let t = a.add_track(TrackType::Bezier, -1);
+
+        // Symmetric segment: x control points are 0,0,1,1 so t=0.5 maps to
+        // x=0.5, and the value is the Bézier midpoint.
+        assert_eq!(
+            a.bezier_track_insert_key(t, 0.0, 0.0, V2::ZERO, V2::ZERO),
+            Some(0)
+        );
+        assert_eq!(
+            a.bezier_track_insert_key(t, 1.0, 10.0, V2::ZERO, V2::ZERO),
+            Some(1)
+        );
+        assert_eq!(a.bezier_track_get_key_count(t), 2);
+        let mid = a.bezier_track_interpolate(t, 0.5).unwrap();
+        assert!((mid - 5.0).abs() < 1e-3, "{mid}");
+
+        // Clamped outside the key range.
+        assert_eq!(a.bezier_track_interpolate(t, -1.0), Some(0.0));
+        assert_eq!(a.bezier_track_interpolate(t, 2.0), Some(10.0));
+
+        // Same time replaces the key.
+        assert_eq!(
+            a.bezier_track_insert_key(t, 1.0, 20.0, V2::ZERO, V2::ZERO),
+            Some(1)
+        );
+        assert_eq!(a.bezier_track_get_key_count(t), 2);
+        assert_eq!(a.bezier_track_get_key(t, 1).unwrap().value, 20.0);
+    }
+
+    #[test]
+    fn bezier_handles_change_the_midpoint() {
+        use crate::math::vector2::Vector2 as V2;
+        let mut a = Animation::new();
+        let t = a.add_track(TrackType::Bezier, -1);
+        a.bezier_track_insert_key(t, 0.0, 0.0, V2::ZERO, V2::new(0.0, 5.0));
+        a.bezier_track_insert_key(t, 1.0, 10.0, V2::ZERO, V2::ZERO);
+
+        // out_handle pulls the curve up: y at the half is 6.875, not 5.
+        let mid = a.bezier_track_interpolate(t, 0.5).unwrap();
+        assert!((mid - 6.875).abs() < 1e-2, "{mid}");
     }
 
     #[test]
