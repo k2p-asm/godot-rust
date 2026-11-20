@@ -913,4 +913,61 @@ mod tests {
         assert_eq!(min(&Variant::Int(2), &Variant::Float(1.5)).unwrap(), Variant::Float(1.5));
         assert!(min(&Variant::Int(2), &Variant::String(GoString::from_str("x"))).is_err());
     }
+
+    #[test]
+    fn string_conversions() {
+        // Parsing goes through the ported variant parser; failures are Nil.
+        assert_eq!(str_to_var("42"), Variant::Int(42));
+        assert_eq!(str_to_var("1.5"), Variant::Float(1.5));
+        assert_eq!(str_to_var("\"text\""), Variant::String(GoString::from_str("text")));
+        assert_eq!(
+            str_to_var("[1, 2]"),
+            Variant::Array(vec![Variant::Int(1), Variant::Int(2)])
+        );
+        assert_eq!(str_to_var("not a variant at all"), Variant::Nil);
+        assert!(str_to_var_checked("not a variant at all").is_err());
+
+        // Writing is the canonical text form; parsing it back round-trips.
+        let value = Variant::Array(vec![
+            Variant::Int(1),
+            Variant::String(GoString::from_str("two")),
+        ]);
+        let text = var_to_str(&value);
+        assert_eq!(str_to_var(&text), value);
+        assert_eq!(var_to_str(&Variant::Int(7)), "7");
+        assert_eq!(var_to_str(&Variant::Float(1.5)), "1.5");
+
+        // type_convert covers the scalar targets.
+        assert_eq!(
+            type_convert(&Variant::Float(2.9), VariantType::Int).unwrap(),
+            Variant::Int(2)
+        );
+        assert_eq!(
+            type_convert(&Variant::Int(3), VariantType::Float).unwrap(),
+            Variant::Float(3.0)
+        );
+        assert_eq!(
+            type_convert(&Variant::Int(0), VariantType::Bool).unwrap(),
+            Variant::Bool(false)
+        );
+        assert_eq!(
+            type_convert(&Variant::Int(1), VariantType::Bool).unwrap(),
+            Variant::Bool(true)
+        );
+        assert_eq!(
+            type_convert(&Variant::Bool(true), VariantType::String).unwrap(),
+            Variant::String(GoString::from_str("true"))
+        );
+        assert_eq!(
+            type_convert(&Variant::Nil, VariantType::Nil).unwrap(),
+            Variant::Nil
+        );
+        // Unsupported targets report the requested type.
+        match type_convert(&Variant::Int(1), VariantType::Vector2) {
+            Err(CallError::InvalidArgument { expected, .. }) => {
+                assert_eq!(expected, VariantType::Vector2);
+            }
+            other => panic!("expected an invalid-argument error, got {other:?}"),
+        }
+    }
 }
