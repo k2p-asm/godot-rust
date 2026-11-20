@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **762 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **767 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -170,6 +170,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/color_names.rs` | `core/math/color_names.inc` | 146 `(NAME, 0xRRGGBBAA)` pairs from `tools/gen_color_names.py`, cross-checked with an independent C++ parser |
 | `string/gstring.rs` | `core/string/ustring.h/.cpp` (start) | COW buffer (`Arc::make_mut`), append/find/rfind/substr/begins_with/ends_with/strip_edges/split/replace/count/join/to_int/is_valid_int/to_float/is_valid_float/insert/repeat/find_char/pad_decimals/pad_zeros/lpad/rpad/trim_prefix/trim_suffix/quote/unquote/is_quoted/is_lowercase/is_uppercase/path helpers (get_file, get_extension, get_basename, path_join, is_absolute_path), ASCII + Unicode case mapping (`to_upper`/`to_lower`, locale-independent, non-differential), Murmur3 `hash()`. UTF-8/UTF-16 encode/decode with surrogate and U+10FFFF boundary tests (not differential: `ustring.cpp` cannot be linked in the harness). `String::num` pending |
 | `object/mod.rs` | `core/object/object.h`, `ref_counted.*` | `ObjectId` (unique, never reused, `is_valid`), `Object` lifetime registry, `RefCounted` ref/unref that destroys at zero. **Non-differential** |
+| `io/path_utils.rs` | `core/string/ustring.cpp` (`simplify_path`, `get_base_dir`, `is_network_share_path`) | Drive/scheme/UNC/root prefix splitting, backslash normalisation, repeated-separator collapsing and the `.`/`..` rules — including the two engine exceptions: `res://` keeps leading `..` (glTF importer) and absolute non-`res://` paths drop it. `get_base_dir` follows the same four prefixes in the engine's order. **Non-differential** |
 | `scene/importer_mesh.rs` | `scene/resources/3d/importer_mesh.*` (surfaces) | Blend-shape names sanitised (`:` → `_`) and only addable before any surface, `add_surface` validating `ARRAY_MAX` (13) entries, one blend-shape array list per declared shape, non-empty vertex array and matching blend-shape vertex counts; per-surface primitive/name/flags/material/LOD reads, LOD writes via the add call, and `clear`. ArrayMesh conversion, LOD generation and lightmap unwrap not ported. **Non-differential** |
 | `scene/particles_3d.rs` | `scene/3d/gpu_particles_3d.*` (state) | GPUParticles3D constructor defaults (amount 8, lifetime 1, **fixed FPS 30**, AABB `(-4,-4,-4)+(8,8,8)`, index draw order, collision size 0.01), draw-pass list with index checks, transform-align mode/channel/axis, trails and the same amount/lifetime/trail bounds; `interp_to_end` clamps `0..=1`. Rendering/RID not ported. **Non-differential** |
 | `scene/shapes_3d.rs` | `scene/resources/3d/*_shape_3d.*` (state) | Box `(1,1,1)`, sphere/cylinder radius 0.5, capsule 0.5/2 with the height↔radius coupling and `mid_height`, separation ray length 1, world boundary plane `(0,1,0,0)`, convex/concave polygons, and the heightmap's resize rules (sizes `< 1` ignored, data length must match `width*depth`). Physics server calls not ported. **Non-differential** |
