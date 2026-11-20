@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **633 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **636 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -210,6 +210,8 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `scene/light_occluder_2d.rs` | `scene/2d/light_occluder_2d.*` | OccluderPolygon2D vertices/closed/cull mode and LightOccluder2D polygon reference, light mask and SDF flag. RIDs/SDF generation not ported. **Non-differential** |
 | `io/json.rs` | `core/io/json.*` (parse/stringify) | Engine token rules (floats for all numbers), full string escapes incl. surrogate pairs, exact error messages/lines, 1024 depth cap; stringify with sorted keys, optional indent, 14-magnitude fixed precision, `0.0`/inf/NaN handling and JSON escaping. Native conversions not ported. **Non-differential** |
 | `scene/panel_container.rs` | `scene/gui/panel_container.*` (layout) | Minimum `child + stylebox` and child cell `Rect2(offset, size - style_min)` with the child's flags via `Control::layout_in_cell`. Theme lookup not ported. **Non-differential** |
+| `scene/label_settings.rs` | `scene/resources/label_settings.*` | Line/paragraph spacing, font handle, size 16, colours, shadow defaults and the ordered stacked outline/shadow lists with the engine's add/move/remove/count/validation rules. Text layout not ported. **Non-differential** |
+| `scene/texture_classes.rs` | `scene/resources/atlas_texture.*`, `animated_texture.*` | AtlasTexture atlas/region (floored size)/margin/filter-clip; AnimatedTexture with 256 frame slots, per-frame texture/duration, count 1..=256, current-frame and speed-scale (`-1000` allowed, `1000` rejected) validation. Playback/proxy/image access not ported. **Non-differential** |
 | `scene/canvas_item_material.rs` | `scene/resources/canvas_item_material.*` | Six blend modes, three light modes, particles-animation flag and the constructor's 1x1 frames/loop-off state. Shader/RID plumbing not ported. **Non-differential** |
 | `scene/camera_attributes.rs` | `scene/resources/camera_attributes.*` | Base/practical/physical attributes with constructor defaults (including the practical `0..800` and physical `-8..10` auto-exposure ranges), DOF fields, the physical FOV from the 24 mm sensor and focal length, practical `sensitivity/3072007` and physical `1/(aperture²·shutter·(100/sensitivity)·1.2)` normalizations. RID/DOF upload not ported. **Non-differential** |
 | `scene/mesh_instance_2d.rs` | `scene/2d/{mesh_instance_2d,multimesh_instance_2d}.*` | Mesh/MMesh resource handles plus optional texture. Drawing and navigation callbacks not ported. **Non-differential** |
