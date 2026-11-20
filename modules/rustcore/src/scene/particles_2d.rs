@@ -223,8 +223,9 @@ impl GpuParticles2DData {
         self.interpolate
     }
 
+    /// `CLAMP(p_interp, 0.0, 1.0)`.
     pub fn set_interp_to_end_factor(&mut self, factor: f32) {
-        self.interp_to_end_factor = factor;
+        self.interp_to_end_factor = factor.clamp(0.0, 1.0);
     }
 
     pub fn get_interp_to_end_factor(&self) -> f32 {
