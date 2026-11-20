@@ -39,6 +39,7 @@ pub mod primitive_meshes;
 pub mod worlds;
 pub mod spring_arm_3d;
 pub mod path_nodes;
+pub mod occluders;
 pub mod ray_cast;
 pub mod shape_cast;
 pub mod collision_shape;
