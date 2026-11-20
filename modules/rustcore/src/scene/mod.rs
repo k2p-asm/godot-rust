@@ -30,6 +30,7 @@ pub mod grid_container;
 pub mod gui_indicators;
 pub mod gui_misc;
 pub mod immediate_mesh;
+pub mod importer_mesh;
 pub mod importer_mesh_instance_3d;
 pub mod label_settings;
 pub mod light_2d;
