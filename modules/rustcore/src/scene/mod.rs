@@ -17,3 +17,4 @@ pub mod node_2d;
 pub mod parallax_layer;
 pub mod sprite_2d;
 pub mod sprite_frames;
+pub mod tile_set;

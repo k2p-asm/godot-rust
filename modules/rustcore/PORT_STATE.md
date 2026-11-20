@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **365 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **369 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -148,6 +148,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/transform_2d.rs` | `core/math/transform_2d.*` | complete |
 | `scene/node_2d.rs` | `scene/2d/node_2d.*` (data half) | position/rotation/scale/skew with the engine's lazy decomposition of `set_transform`, zero-scale clamp, `rotate`/`translate`, relative transform. `set_rotation_scale_and_skew` is differential (`t2.rs_skew*`). Parenting and notifications need the object layer |
 | `scene/canvas_item.rs` | `scene/main/canvas_item.*` (data half) | visibility with the cached `parent_visible_in_tree`, `modulate`/`self_modulate` + ancestor composition, `z_index` range check (`-4096..=4096`) and relative composition, `y_sort_enabled`, `show_behind_parent`, clip mode, light/visibility layers |
+| `scene/tile_set.rs` | `scene/resources/2d/tile_set.*` (square cells) | `map_to_local` returns the cell center `(cell+0.5)*tile_size`, `local_to_map` floors `local/tile_size` (so -0.1 maps to cell -1). Half-offset/isometric/hexagon shapes need the layout/corner-correction matrix and return `None` instead of an approximation. **Non-differential** |
 | `scene/parallax_layer.rs` | `scene/2d/parallax_layer.*` | motion scale/offset, mirroring clamped to `>= 0`, captured origin, and `compute_offset_scale` implementing `base*scale + offset*view + origin*view` plus the `ceil`-based mirroring wrap. Rendering-server mirroring not ported. **Non-differential** |
 | `scene/sprite_frames.rs` | `scene/resources/sprite_frames.*` + `scene/2d/animated_sprite_2d.*` | named animations (speed, loop mode, per-frame duration), add/remove/rename, duration fallbacks (1.0), and `AnimatedSprite2DData::advance` with linear wrap, non-loop stop-on-last-frame and ping-pong reversal, including the `speed_scale` divisor and zero-speed freeze. Textures reduced to size; drawing not ported. **Non-differential** |
 | `scene/polygon_2d.rs` | `scene/2d/polygon_2d.*` (data + outline triangulation) | outline, hole list accessors, UVs, vertex colors, texture offset/scale/rotation, invert + border (clamped at 0), poly-as-lines, internal vertex count. `triangulate_outer` uses the ported ear clipping; the hole-aware Clipper path is rejected rather than ignored. **Non-differential** |
