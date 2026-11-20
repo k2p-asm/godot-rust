@@ -28,6 +28,7 @@ pub mod video_stream_player;
 pub mod voxel_gi;
 pub mod graph_edit;
 pub mod graph_node;
+pub mod code_highlighter;
 pub mod color_picker;
 pub mod graph_frame;
 pub mod touch_button;
