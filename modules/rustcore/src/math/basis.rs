@@ -707,7 +707,7 @@ impl Basis {
             let angle = if funcs::is_equal_approx(self.rows[j][j], self.rows[i][i]) {
                 funcs::PI as f32 / 4.0
             } else {
-                0.5 * (2.0 * self.rows[i][j] / (self.rows[j][j] - self.rows[i][i])).atan()
+                0.5f32 * (2.0f32 * self.rows[i][j] / (self.rows[j][j] - self.rows[i][i])).atan()
             };
 
             // Rotation matrix.

@@ -13,6 +13,7 @@ pub mod animation_player;
 pub mod base_button;
 pub mod bit_map;
 pub mod audio_listener_3d;
+pub mod audio_players;
 pub mod audio_stream_polyphonic;
 pub mod bone_attachment_3d;
 pub mod bone_map;
