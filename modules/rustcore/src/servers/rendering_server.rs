@@ -121,6 +121,35 @@ pub struct MaterialState {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub struct EnvironmentState {
+    pub background_mode: i32,
+    pub background_color: Color,
+    pub ambient_light_color: Color,
+    pub ambient_light_energy: f32,
+    pub fog_enabled: bool,
+    pub fog_light_color: Color,
+    pub fog_density: f32,
+    pub tonemap_mode: i32,
+    pub glow_enabled: bool,
+}
+
+impl Default for EnvironmentState {
+    fn default() -> Self {
+        Self {
+            background_mode: 0,
+            background_color: Color::new(0.0, 0.0, 0.0, 1.0),
+            ambient_light_color: Color::new(1.0, 1.0, 1.0, 1.0),
+            ambient_light_energy: 1.0,
+            fog_enabled: false,
+            fog_light_color: Color::new(0.5, 0.6, 0.7, 1.0),
+            fog_density: 0.01,
+            tonemap_mode: 0,
+            glow_enabled: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct MeshSurface {
     pub material: Rid,
     pub aabb: crate::math::aabb::Aabb,
@@ -140,6 +169,7 @@ pub struct RenderingServerData {
     materials: RidOwner<MaterialState>,
     meshes: RidOwner<MeshState>,
     canvases: RidOwner<()>,
+    environments: RidOwner<EnvironmentState>,
 }
 
 impl RenderingServerData {
@@ -493,6 +523,80 @@ impl RenderingServerData {
         self.canvases.count()
     }
 
+    pub fn environment_create(&mut self) -> Rid {
+        self.environments.alloc(EnvironmentState::default())
+    }
+
+    pub fn environment_free(&mut self, env: Rid) -> bool {
+        self.environments.free(env)
+    }
+
+    pub fn environment_get(&self, env: Rid) -> Option<&EnvironmentState> {
+        self.environments.get(env)
+    }
+
+    fn environment_mut(&mut self, env: Rid) -> Option<&mut EnvironmentState> {
+        self.environments.get_mut(env)
+    }
+
+    pub fn environment_set_background(&mut self, env: Rid, mode: i32, color: Color) -> bool {
+        match self.environment_mut(env) {
+            Some(e) => {
+                e.background_mode = mode;
+                e.background_color = color;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn environment_set_ambient_light(&mut self, env: Rid, color: Color, energy: f32) -> bool {
+        match self.environment_mut(env) {
+            Some(e) => {
+                e.ambient_light_color = color;
+                e.ambient_light_energy = energy;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn environment_set_fog(&mut self, env: Rid, enabled: bool, color: Color, density: f32) -> bool {
+        match self.environment_mut(env) {
+            Some(e) => {
+                e.fog_enabled = enabled;
+                e.fog_light_color = color;
+                e.fog_density = density;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn environment_set_tonemap(&mut self, env: Rid, mode: i32) -> bool {
+        match self.environment_mut(env) {
+            Some(e) => {
+                e.tonemap_mode = mode;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn environment_set_glow(&mut self, env: Rid, enabled: bool) -> bool {
+        match self.environment_mut(env) {
+            Some(e) => {
+                e.glow_enabled = enabled;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn environment_count(&self) -> usize {
+        self.environments.count()
+    }
+
     /// iewport_attach_canvas; passing an invalid RID detaches.
     pub fn viewport_attach_canvas(&mut self, viewport: Rid, canvas: Rid) -> bool {
         if canvas.is_valid() && !self.canvases.is_valid(canvas) {
@@ -818,6 +922,48 @@ mod tests {
         ));
         assert!(!rs.canvas_item_clear(item));
         assert!(rs.canvas_item_commands(item).is_none());
+    }
+
+    #[test]
+    fn environment_defaults_and_setters() {
+        let mut rs = RenderingServerData::new();
+        let env = rs.environment_create();
+        let e = rs.environment_get(env).unwrap();
+        assert_eq!(e.background_mode, 0);
+        assert_eq!(e.background_color, Color::new(0.0, 0.0, 0.0, 1.0));
+        assert_eq!(e.ambient_light_energy, 1.0);
+        assert!(!e.fog_enabled);
+        assert_eq!(e.tonemap_mode, 0);
+        assert!(!e.glow_enabled);
+
+        assert!(rs.environment_set_background(env, 1, Color::new(0.1, 0.2, 0.3, 1.0)));
+        assert!(rs.environment_set_ambient_light(env, Color::new(0.5, 0.5, 0.5, 1.0), 2.5));
+        assert!(rs.environment_set_fog(env, true, Color::new(0.4, 0.4, 0.4, 1.0), 0.02));
+        assert!(rs.environment_set_tonemap(env, 3));
+        assert!(rs.environment_set_glow(env, true));
+
+        let e = rs.environment_get(env).unwrap();
+        assert_eq!(e.background_mode, 1);
+        assert_eq!(e.background_color, Color::new(0.1, 0.2, 0.3, 1.0));
+        assert_eq!(e.ambient_light_energy, 2.5);
+        assert!(e.fog_enabled);
+        assert!((e.fog_density - 0.02).abs() < 1e-6);
+        assert_eq!(e.tonemap_mode, 3);
+        assert!(e.glow_enabled);
+    }
+
+    #[test]
+    fn freed_environments_reject_writes() {
+        let mut rs = RenderingServerData::new();
+        let env = rs.environment_create();
+        assert!(rs.environment_free(env));
+        assert!(!rs.environment_set_glow(env, true));
+        assert!(!rs.environment_set_tonemap(env, 1));
+        assert!(rs.environment_get(env).is_none());
+        assert_eq!(rs.environment_count(), 0);
+        // Other owners are independent.
+        assert_eq!(rs.canvas_item_count(), 0);
+        assert_eq!(rs.mesh_count(), 0);
     }
 
     #[test]
