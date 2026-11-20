@@ -15,13 +15,46 @@ use crate::math::vector2i::Vector2i;
 use crate::servers::rendering_enums::TextureType;
 use crate::servers::rid::{Rid, RidOwner};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum CanvasCommand {
+    Rect {
+        rect: crate::math::rect2::Rect2,
+        color: Color,
+        filled: bool,
+        width: f32,
+    },
+    Line {
+        from: crate::math::vector2::Vector2,
+        to: crate::math::vector2::Vector2,
+        color: Color,
+        width: f32,
+        antialiased: bool,
+    },
+    Polyline {
+        points: Vec<crate::math::vector2::Vector2>,
+        color: Color,
+        width: f32,
+    },
+    Polygon {
+        points: Vec<crate::math::vector2::Vector2>,
+        colors: Vec<Color>,
+    },
+    TextureRect {
+        texture: Rid,
+        rect: crate::math::rect2::Rect2,
+        modulate: Color,
+        transpose: bool,
+    },
+}
+
+#[derive(Clone, Debug)]
 pub struct CanvasItemState {
     pub transform: Transform2D,
     pub modulate: Color,
     pub self_modulate: Color,
     pub z_index: i32,
     pub visible: bool,
+    pub commands: Vec<CanvasCommand>,
 }
 
 impl Default for CanvasItemState {
@@ -32,6 +65,7 @@ impl Default for CanvasItemState {
             self_modulate: Color::new(1.0, 1.0, 1.0, 1.0),
             z_index: 0,
             visible: true,
+            commands: Vec::new(),
         }
     }
 }
@@ -174,6 +208,84 @@ impl RenderingServerData {
 
     pub fn canvas_item_count(&self) -> usize {
         self.canvas_items.count()
+    }
+
+    fn push_command(&mut self, item: Rid, command: CanvasCommand) -> bool {
+        match self.canvas_items.get_mut(item) {
+            Some(s) => {
+                s.commands.push(command);
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn canvas_item_add_rect(
+        &mut self,
+        item: Rid,
+        rect: crate::math::rect2::Rect2,
+        color: Color,
+        filled: bool,
+        width: f32,
+    ) -> bool {
+        self.push_command(item, CanvasCommand::Rect { rect, color, filled, width })
+    }
+
+    pub fn canvas_item_add_line(
+        &mut self,
+        item: Rid,
+        from: crate::math::vector2::Vector2,
+        to: crate::math::vector2::Vector2,
+        color: Color,
+        width: f32,
+        antialiased: bool,
+    ) -> bool {
+        self.push_command(item, CanvasCommand::Line { from, to, color, width, antialiased })
+    }
+
+    pub fn canvas_item_add_polyline(
+        &mut self,
+        item: Rid,
+        points: Vec<crate::math::vector2::Vector2>,
+        color: Color,
+        width: f32,
+    ) -> bool {
+        self.push_command(item, CanvasCommand::Polyline { points, color, width })
+    }
+
+    pub fn canvas_item_add_polygon(
+        &mut self,
+        item: Rid,
+        points: Vec<crate::math::vector2::Vector2>,
+        colors: Vec<Color>,
+    ) -> bool {
+        self.push_command(item, CanvasCommand::Polygon { points, colors })
+    }
+
+    pub fn canvas_item_add_texture_rect(
+        &mut self,
+        item: Rid,
+        texture: Rid,
+        rect: crate::math::rect2::Rect2,
+        modulate: Color,
+        transpose: bool,
+    ) -> bool {
+        self.push_command(item, CanvasCommand::TextureRect { texture, rect, modulate, transpose })
+    }
+
+    /// canvas_item_clear: drops the recorded commands, keeps the item state.
+    pub fn canvas_item_clear(&mut self, item: Rid) -> bool {
+        match self.canvas_items.get_mut(item) {
+            Some(s) => {
+                s.commands.clear();
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn canvas_item_commands(&self, item: Rid) -> Option<&[CanvasCommand]> {
+        self.canvas_items.get(item).map(|s| s.commands.as_slice())
     }
 
     pub fn viewport_create(&mut self) -> Rid {
@@ -504,6 +616,83 @@ mod tests {
         assert!(rs.material_free(mat));
         assert_eq!(rs.material_get_param(mat, "roughness"), None);
         assert!(!rs.material_set_param(mat, "x", Variant::Int(1)));
+    }
+
+    #[test]
+    fn draw_commands_are_recorded_in_order() {
+        use crate::math::rect2::Rect2;
+        use crate::math::vector2::Vector2;
+
+        let mut rs = RenderingServerData::new();
+        let item = rs.canvas_item_create();
+        let tex = rs.texture_2d_create(0, Vector2i::new(4, 4));
+
+        assert!(rs.canvas_item_add_rect(
+            item,
+            Rect2::new(Vector2::ZERO, Vector2::new(10.0, 5.0)),
+            Color::new(1.0, 0.0, 0.0, 1.0),
+            true,
+            0.0
+        ));
+        assert!(rs.canvas_item_add_line(
+            item,
+            Vector2::ZERO,
+            Vector2::new(1.0, 1.0),
+            Color::new(0.0, 1.0, 0.0, 1.0),
+            1.5,
+            true
+        ));
+        assert!(rs.canvas_item_add_polyline(
+            item,
+            vec![Vector2::ZERO, Vector2::new(2.0, 0.0)],
+            Color::new(0.0, 0.0, 1.0, 1.0),
+            2.0
+        ));
+        assert!(rs.canvas_item_add_polygon(
+            item,
+            vec![Vector2::ZERO, Vector2::new(1.0, 0.0), Vector2::new(0.0, 1.0)],
+            vec![Color::new(1.0, 1.0, 1.0, 1.0)]
+        ));
+        assert!(rs.canvas_item_add_texture_rect(
+            item,
+            tex,
+            Rect2::new(Vector2::ZERO, Vector2::new(4.0, 4.0)),
+            Color::new(1.0, 1.0, 1.0, 1.0),
+            false
+        ));
+
+        let cmds = rs.canvas_item_commands(item).unwrap();
+        assert_eq!(cmds.len(), 5);
+        assert!(matches!(cmds[0], CanvasCommand::Rect { filled: true, width: 0.0, .. }));
+        assert!(matches!(cmds[1], CanvasCommand::Line { width, antialiased: true, .. } if (width - 1.5).abs() < 1e-6));
+        assert!(matches!(&cmds[2], CanvasCommand::Polyline { points, .. } if points.len() == 2));
+        assert!(matches!(&cmds[3], CanvasCommand::Polygon { points, colors } if points.len() == 3 && colors.len() == 1));
+        assert!(matches!(cmds[4], CanvasCommand::TextureRect { texture, transpose: false, .. } if texture == tex));
+
+        // Clearing drops the commands but keeps the item itself.
+        assert!(rs.canvas_item_clear(item));
+        assert_eq!(rs.canvas_item_commands(item).unwrap().len(), 0);
+        assert_eq!(rs.canvas_item_count(), 1);
+    }
+
+    #[test]
+    fn freed_items_reject_draw_commands() {
+        use crate::math::rect2::Rect2;
+        use crate::math::vector2::Vector2;
+
+        let mut rs = RenderingServerData::new();
+        let item = rs.canvas_item_create();
+        assert!(rs.canvas_item_free(item));
+
+        assert!(!rs.canvas_item_add_rect(
+            item,
+            Rect2::new(Vector2::ZERO, Vector2::ONE),
+            Color::new(1.0, 1.0, 1.0, 1.0),
+            true,
+            0.0
+        ));
+        assert!(!rs.canvas_item_clear(item));
+        assert!(rs.canvas_item_commands(item).is_none());
     }
 
     #[test]
