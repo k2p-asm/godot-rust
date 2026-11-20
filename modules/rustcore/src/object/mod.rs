@@ -17,6 +17,7 @@
 
 pub mod class_db;
 pub mod message_queue;
+pub mod undo_redo;
 pub mod resource;
 
 use std::collections::HashSet;
