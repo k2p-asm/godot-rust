@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **654 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **658 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -211,6 +211,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `io/json.rs` | `core/io/json.*` (parse/stringify) | Engine token rules (floats for all numbers), full string escapes incl. surrogate pairs, exact error messages/lines, 1024 depth cap; stringify with sorted keys, optional indent, 14-magnitude fixed precision, `0.0`/inf/NaN handling and JSON escaping. Native conversions not ported. **Non-differential** |
 | `scene/panel_container.rs` | `scene/gui/panel_container.*` (layout) | Minimum `child + stylebox` and child cell `Rect2(offset, size - style_min)` with the child's flags via `Control::layout_in_cell`. Theme lookup not ported. **Non-differential** |
 | `scene/label_settings.rs` | `scene/resources/label_settings.*` | Line/paragraph spacing, font handle, size 16, colours, shadow defaults and the ordered stacked outline/shadow lists with the engine's add/move/remove/count/validation rules. Text layout not ported. **Non-differential** |
+| `scene/skeleton_profile.rs` | `scene/resources/skeleton_profile.*` | Group/bone metadata with resize retention, per-index accessors/defaults, find/has bone (empty name never found) and the read-only flag blocking mutations. **Non-differential** |
 | `scene/mesh_library.rs` | `scene/resources/3d/mesh_library.*` | Sorted integer items with create/remove/clear, name/mesh/transform/shadow/preview/navigation data, shape pairs, last-unused id and find-by-name; engine defaults for missing items. **Non-differential** |
 | `scene/skin.rs` | `scene/resources/3d/skin.*` | Bind defaults (-1 bone, empty name, identity pose), count resize rejecting negatives, add_bind/add_named_bind, index-validated setters and engine-default reads, clear_binds. **Non-differential** |
 | `scene/immediate_mesh.rs` | `scene/resources/immediate_mesh.*` (capture) | Surface begin/end with the double-begin and empty-end rejections, attribute setters that back-fill existing vertices when first enabled, 2D/3D mixing rejection, per-surface primitive/material/attribute arrays and `clear_surfaces`. Packed buffers/format/AABB not ported. **Non-differential** |

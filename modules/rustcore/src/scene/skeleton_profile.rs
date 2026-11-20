@@ -19,13 +19,13 @@ pub enum TailDirection {
     End,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct SkeletonProfileGroup {
     pub name: StringName,
     pub texture: Option<Rid>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SkeletonProfileBone {
     pub bone_name: StringName,
     pub bone_parent: StringName,
@@ -52,7 +52,7 @@ impl Default for SkeletonProfileBone {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct SkeletonProfileData {
     read_only: bool,
     root_bone: StringName,
