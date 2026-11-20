@@ -162,6 +162,7 @@ pub mod skeleton_modification_2d;
 pub mod skeleton_ik_3d;
 pub mod skin;
 pub mod sky;
+pub mod sky_materials;
 pub mod scroll_container;
 pub mod node_2d;
 pub mod node_3d;
