@@ -77,6 +77,7 @@ pub mod sprite_frames;
 pub mod style_box;
 pub mod texture_classes;
 pub mod texture_misc;
+pub mod tab_bar;
 pub mod theme;
 pub mod tile_map_layer;
 pub mod tile_set;
