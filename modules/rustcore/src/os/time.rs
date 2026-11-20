@@ -152,6 +152,41 @@ pub fn offset_string_from_offset_minutes(minutes: i64) -> String {
     format!("{}{:02}:{:02}", sign, abs / 60, abs % 60)
 }
 
+/// Process start, used as the origin of the monotonic tick clocks (the engine's
+/// ticks are also measured from startup).
+fn process_start() -> std::time::Instant {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    *START.get_or_init(std::time::Instant::now)
+}
+
+/// `get_ticks_usec`: monotonic microseconds since the process started (the
+/// engine's platform layer supplies its own origin).
+pub fn ticks_usec() -> u64 {
+    process_start().elapsed().as_micros() as u64
+}
+
+/// `get_ticks_msec`.
+pub fn ticks_msec() -> u64 {
+    ticks_usec() / 1000
+}
+
+/// `get_unix_time_from_system`: seconds since the epoch with fractional part.
+/// A clock before the epoch reports 0.0.
+pub fn unix_time_from_system() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs_f64())
+        .unwrap_or(0.0)
+}
+
+/// `get_unix_time_from_system` truncated to whole seconds.
+pub fn unix_time_from_system_i64() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(0)
+}
+
 /// Days in `month` (1..=12) for the given year (proleptic Gregorian).
 pub fn days_in_month(year: i32, month: i32) -> i32 {
     const DAYS: [i32; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -371,5 +406,24 @@ mod tests {
         assert_eq!(unix_time_from_datetime_string("2023-02-29T00:00:00"), None);
         assert_eq!(unix_time_from_datetime_string("2023-04-31T00:00:00"), None);
         assert_eq!(unix_time_from_datetime_string("2023-01-01T00:00:60"), None);
+    }
+
+    #[test]
+    fn system_clock_and_ticks() {
+        // The monotonic tick clocks are non-decreasing and consistent.
+        let first = ticks_usec();
+        let second = ticks_usec();
+        assert!(second >= first);
+        assert_eq!(ticks_msec(), ticks_usec() / 1000);
+
+        // The wall clock is after 2020-01-01 and reports fractional seconds.
+        let now = unix_time_from_system();
+        assert!(now > 1_577_836_800.0, "unix time {now}");
+        let whole = unix_time_from_system_i64();
+        assert!(whole > 1_577_836_800);
+        assert!((now - whole as f64).abs() < 2.0);
+        // The wall clock agrees with the civil conversion.
+        let datetime = datetime_from_unix_time(whole);
+        assert!(datetime.year >= 2020);
     }
 }
