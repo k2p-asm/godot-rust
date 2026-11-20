@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **210 unit tests + 33 differential tests, 0 failures.**
+- `cargo test`: **214 unit tests + 33 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -139,7 +139,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/aabb.rs` | `core/math/aabb.*` | complete |
 | `math/color.rs` | `core/math/color.*` | numeric + `html` + OK-HSL/HSV + named colors (146, table generated) |
 | `math/ok_color.rs` | `thirdparty/misc/ok_color.h` | Okhsl/Okhsv both directions, verified against the header via `parity/okcolor_dump.cpp` |
-| `math/quaternion.rs` | `core/math/quaternion.*` | rotation math done; `get_euler`, `log`/`exp`, cubic interpolation pending |
+| `math/quaternion.rs` | `core/math/quaternion.*` | complete: rotation math, `get_euler` (6 orders, differential), `log`/`exp`, `slerp`/`slerpni`, spherical cubic interpolate (+ in-time), all verified against `quaternion.cpp` |
 | `math/basis.rs` | `core/math/basis.*` | core + all 6 Euler orders + axis-angle + `diagonalize`, `rotate_sh`, `rotref_posscale_decomposition` |
 | `math/transform_3d.rs` | `core/math/transform_3d.*` | complete incl. batch `xform_array`/`xform_array_inv` (verified) |
 | `math/transform_2d.rs` | `core/math/transform_2d.*` | complete |

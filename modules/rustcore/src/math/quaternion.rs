@@ -1,9 +1,8 @@
-//! Port of `core/math/quaternion.h` + `quaternion.cpp` (rotation math only).
+//! Port of `core/math/quaternion.h` + `quaternion.cpp`.
 //!
-//! Pending: `get_euler` (depends on `Basis::get_euler`), `log`/`exp` and the
-//! spherical cubic interpolation helpers, which depend on Basis rotation
-//! decomposition.
+//! Everything is ported except `operator String`.
 
+use crate::math::basis::{Basis, EulerOrder};
 use crate::math::funcs;
 use crate::math::vector3::Vector3;
 
@@ -152,6 +151,164 @@ impl Quaternion {
         Vector3::new(self.x * r, self.y * r, self.z * r)
     }
 
+    /// `Quaternion::get_euler`: delegates to `Basis::get_euler`, exactly like
+    /// the engine (the quaternion is converted to a basis first).
+    pub fn get_euler(&self, order: EulerOrder) -> Vector3 {
+        Basis::from_quaternion(*self).get_euler(order)
+    }
+
+    /// `Quaternion::log`: axis * angle in the vector part, zero scalar part.
+    pub fn log(&self) -> Self {
+        let v = self.get_axis() * self.get_angle();
+        Self::new(v.x, v.y, v.z, 0.0)
+    }
+
+    /// `Quaternion::exp`: inverse of `log`.
+    pub fn exp(&self) -> Self {
+        let v = Vector3::new(self.x, self.y, self.z);
+        let theta = v.length();
+        let axis = v.normalized();
+        // Degenerate rotations map to identity, like the C++ early return.
+        if theta < funcs::CMP_EPSILON as f32 || !axis.is_normalized() {
+            return Self::IDENTITY;
+        }
+        Self::from_axis_angle(axis, theta)
+    }
+
+    /// `Quaternion::slerpni`: slerp without shortest-path adjustment.
+    pub fn slerpni(&self, to: &Quaternion, weight: f32) -> Self {
+        let dot = self.dot(to);
+        if dot.abs() > 0.9999 {
+            return *self;
+        }
+
+        let theta = funcs::acos(dot);
+        let sin_t = 1.0 / theta.sin();
+        let new_factor = (weight * theta).sin() * sin_t;
+        let inv_factor = ((1.0 - weight) * theta).sin() * sin_t;
+
+        Self::new(
+            inv_factor * self.x + new_factor * to.x,
+            inv_factor * self.y + new_factor * to.y,
+            inv_factor * self.z + new_factor * to.z,
+            inv_factor * self.w + new_factor * to.w,
+        )
+    }
+
+    /// `Quaternion::spherical_cubic_interpolate`: cubic interpolation done in
+    /// log space around both endpoints, then blended, which cancels the
+    /// ambiguity of the exp map.
+    pub fn spherical_cubic_interpolate(
+        &self,
+        b: &Quaternion,
+        pre_a: &Quaternion,
+        post_b: &Quaternion,
+        weight: f32,
+    ) -> Self {
+        let mut from_q = Basis::from_quaternion(*self).get_rotation_quaternion();
+        let mut pre_q = Basis::from_quaternion(*pre_a).get_rotation_quaternion();
+        let mut to_q = Basis::from_quaternion(*b).get_rotation_quaternion();
+        let mut post_q = Basis::from_quaternion(*post_b).get_rotation_quaternion();
+
+        // Flip opposite phases so all four lie in the same hemisphere.
+        let flip1 = from_q.dot(&pre_q).is_sign_negative();
+        pre_q = if flip1 { -pre_q } else { pre_q };
+        let flip2 = from_q.dot(&to_q).is_sign_negative();
+        to_q = if flip2 { -to_q } else { to_q };
+        let flip3 = if flip2 {
+            to_q.dot(&post_q) <= 0.0
+        } else {
+            to_q.dot(&post_q).is_sign_negative()
+        };
+        post_q = if flip3 { -post_q } else { post_q };
+
+        let from_inv = from_q.inverse();
+        let ln_from = Quaternion::new(0.0, 0.0, 0.0, 0.0);
+        let ln_to = (from_inv * to_q).log();
+        let ln_pre = (from_inv * pre_q).log();
+        let ln_post = (from_inv * post_q).log();
+        let ln = Quaternion::new(
+            funcs::cubic_interpolate(ln_from.x, ln_to.x, ln_pre.x, ln_post.x, weight),
+            funcs::cubic_interpolate(ln_from.y, ln_to.y, ln_pre.y, ln_post.y, weight),
+            funcs::cubic_interpolate(ln_from.z, ln_to.z, ln_pre.z, ln_post.z, weight),
+            0.0,
+        );
+        let q1 = from_q * ln.exp();
+
+        let to_inv = to_q.inverse();
+        let ln_from = (to_inv * from_q).log();
+        let ln_to = Quaternion::new(0.0, 0.0, 0.0, 0.0);
+        let ln_pre = (to_inv * pre_q).log();
+        let ln_post = (to_inv * post_q).log();
+        let ln = Quaternion::new(
+            funcs::cubic_interpolate(ln_from.x, ln_to.x, ln_pre.x, ln_post.x, weight),
+            funcs::cubic_interpolate(ln_from.y, ln_to.y, ln_pre.y, ln_post.y, weight),
+            funcs::cubic_interpolate(ln_from.z, ln_to.z, ln_pre.z, ln_post.z, weight),
+            0.0,
+        );
+        let q2 = to_q * ln.exp();
+
+        q1.slerp(&q2, weight)
+    }
+
+    /// `Quaternion::spherical_cubic_interpolate_in_time`: the same blend with
+    /// per-key times instead of a normalised weight.
+    #[allow(clippy::too_many_arguments)]
+    pub fn spherical_cubic_interpolate_in_time(
+        &self,
+        b: &Quaternion,
+        pre_a: &Quaternion,
+        post_b: &Quaternion,
+        weight: f32,
+        b_t: f32,
+        pre_a_t: f32,
+        post_b_t: f32,
+    ) -> Self {
+        let from_q = Basis::from_quaternion(*self).get_rotation_quaternion();
+        let mut pre_q = Basis::from_quaternion(*pre_a).get_rotation_quaternion();
+        let mut to_q = Basis::from_quaternion(*b).get_rotation_quaternion();
+        let mut post_q = Basis::from_quaternion(*post_b).get_rotation_quaternion();
+
+        let flip1 = from_q.dot(&pre_q).is_sign_negative();
+        pre_q = if flip1 { -pre_q } else { pre_q };
+        let flip2 = from_q.dot(&to_q).is_sign_negative();
+        to_q = if flip2 { -to_q } else { to_q };
+        let flip3 = if flip2 {
+            to_q.dot(&post_q) <= 0.0
+        } else {
+            to_q.dot(&post_q).is_sign_negative()
+        };
+        post_q = if flip3 { -post_q } else { post_q };
+
+        let from_inv = from_q.inverse();
+        let ln_from = Quaternion::new(0.0, 0.0, 0.0, 0.0);
+        let ln_to = (from_inv * to_q).log();
+        let ln_pre = (from_inv * pre_q).log();
+        let ln_post = (from_inv * post_q).log();
+        let ln = Quaternion::new(
+            funcs::cubic_interpolate_in_time(ln_from.x, ln_to.x, ln_pre.x, ln_post.x, weight, b_t, pre_a_t, post_b_t),
+            funcs::cubic_interpolate_in_time(ln_from.y, ln_to.y, ln_pre.y, ln_post.y, weight, b_t, pre_a_t, post_b_t),
+            funcs::cubic_interpolate_in_time(ln_from.z, ln_to.z, ln_pre.z, ln_post.z, weight, b_t, pre_a_t, post_b_t),
+            0.0,
+        );
+        let q1 = from_q * ln.exp();
+
+        let to_inv = to_q.inverse();
+        let ln_from = (to_inv * from_q).log();
+        let ln_to = Quaternion::new(0.0, 0.0, 0.0, 0.0);
+        let ln_pre = (to_inv * pre_q).log();
+        let ln_post = (to_inv * post_q).log();
+        let ln = Quaternion::new(
+            funcs::cubic_interpolate_in_time(ln_from.x, ln_to.x, ln_pre.x, ln_post.x, weight, b_t, pre_a_t, post_b_t),
+            funcs::cubic_interpolate_in_time(ln_from.y, ln_to.y, ln_pre.y, ln_post.y, weight, b_t, pre_a_t, post_b_t),
+            funcs::cubic_interpolate_in_time(ln_from.z, ln_to.z, ln_pre.z, ln_post.z, weight, b_t, pre_a_t, post_b_t),
+            0.0,
+        );
+        let q2 = to_q * ln.exp();
+
+        q1.slerp(&q2, weight)
+    }
+
     #[inline]
     pub fn get_angle(&self) -> f32 {
         2.0 * funcs::acos(self.w)
@@ -275,5 +432,79 @@ mod tests {
         let v = Vector3::new(0.4, -1.2, 2.5);
         let back = q.inverse().xform(q.xform(v));
         assert!(back.is_equal_approx(v), "{back:?}");
+    }
+
+    #[test]
+    fn euler_round_trip_through_basis() {
+        let angles = Vector3::new(0.3, -0.7, 1.1);
+        let q = Quaternion::from_euler(angles);
+        for order in [
+            EulerOrder::XYZ,
+            EulerOrder::XZY,
+            EulerOrder::YXZ,
+            EulerOrder::YZX,
+            EulerOrder::ZXY,
+            EulerOrder::ZYX,
+        ] {
+            // get_euler returns an equivalent rotation, not necessarily the
+            // same angles: compare the reconstructed basis by rotating a
+            // non-degenerate vector.
+            let e = q.get_euler(order);
+            let rebuilt = Basis::from_euler(e, order).get_rotation_quaternion();
+            for v in [Vector3::RIGHT, Vector3::UP, Vector3::new(0.3, -0.5, 0.8)] {
+                let a = q.xform(v);
+                let b = rebuilt.xform(v);
+                assert!(a.is_equal_approx(b), "{order:?}: {a:?} vs {b:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn log_exp_are_inverse() {
+        for q in [
+            Quaternion::from_axis_angle(Vector3::UP, 0.4),
+            Quaternion::from_euler(Vector3::new(0.2, 0.5, -0.9)),
+        ] {
+            let back = q.log().exp();
+            // log/exp loses the double cover: q and -q are the same rotation.
+            assert!(
+                back.is_equal_approx(&q) || back.is_equal_approx(&(-q)),
+                "{back:?} vs {q:?}"
+            );
+        }
+        // Zero rotation: exp(0) is identity.
+        let zero = Quaternion::new(0.0, 0.0, 0.0, 0.0);
+        assert!(zero.exp().is_equal_approx(&Quaternion::IDENTITY));
+    }
+
+    #[test]
+    fn slerpni_does_not_take_the_short_path() {
+        // 300 degrees apart: slerp goes the short way (60 degrees), slerpni
+        // walks the 300 degree arc.
+        let a = Quaternion::from_axis_angle(Vector3::UP, 0.0);
+        let b = Quaternion::from_axis_angle(Vector3::UP, 300f32.to_radians());
+        let mid_short = a.slerp(&b, 0.5);
+        let mid_long = a.slerpni(&b, 0.5);
+        assert!((mid_short.angle_to(&a) - 30f32.to_radians()).abs() < 1e-3);
+        assert!((mid_long.angle_to(&a) - 150f32.to_radians()).abs() < 1e-3);
+    }
+
+    #[test]
+    fn spherical_cubic_hits_the_endpoints() {
+        let a = Quaternion::from_axis_angle(Vector3::UP, 0.0);
+        let b = Quaternion::from_axis_angle(Vector3::UP, 1.0);
+        let pre = Quaternion::from_axis_angle(Vector3::UP, -0.5);
+        let post = Quaternion::from_axis_angle(Vector3::UP, 1.5);
+
+        let at0 = a.spherical_cubic_interpolate(&b, &pre, &post, 0.0);
+        let at1 = a.spherical_cubic_interpolate(&b, &pre, &post, 1.0);
+        assert!(at0.is_equal_approx(&a), "{at0:?}");
+        assert!(at1.is_equal_approx(&b), "{at1:?}");
+
+        // In-time variant agrees with the uniform one when the keys are evenly
+        // spaced (times 0, 1 with weight 0.5).
+        let uniform = a.spherical_cubic_interpolate(&b, &pre, &post, 0.5);
+        let timed = a.spherical_cubic_interpolate_in_time(&b, &pre, &post, 0.5, 1.0, -1.0, 2.0);
+        assert!(uniform.is_equal_approx(&timed), "{uniform:?} vs {timed:?}");
     }
 }

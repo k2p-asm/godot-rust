@@ -404,6 +404,47 @@ fn quaternion_matches_cpp() {
         &v3(Quaternion::from_euler(Vector3::new(0.3, -0.7, 1.1)).xform(v)),
         F32_TOL,
     );
+
+    let ql = q2.log();
+    check(&m, "quat.log", &[ql.x as f64, ql.y as f64, ql.z as f64, ql.w as f64], F32_TOL);
+    check(&m, "quat.exp", &v3(ql.exp().xform(v)), F32_TOL);
+    check(&m, "quat.slerpni", &v3(q2.slerpni(&q, 0.35).xform(v)), F32_TOL);
+
+    for (i, order) in [
+        EulerOrder::XYZ,
+        EulerOrder::XZY,
+        EulerOrder::YXZ,
+        EulerOrder::YZX,
+        EulerOrder::ZXY,
+        EulerOrder::ZYX,
+    ]
+    .iter()
+    .enumerate()
+    {
+        let e = q.get_euler(*order);
+        check(
+            &m,
+            &format!("quat.order{i}"),
+            &[e.x as f64, e.y as f64, e.z as f64],
+            F32_TOL,
+        );
+    }
+
+    let qb = Quaternion::from_axis_angle(Vector3::UP, 1.0);
+    let qpre = Quaternion::from_axis_angle(Vector3::UP, -0.5);
+    let qpost = Quaternion::from_axis_angle(Vector3::UP, 1.5);
+    check(
+        &m,
+        "quat.cubic",
+        &v3(q.spherical_cubic_interpolate(&qb, &qpre, &qpost, 0.4).xform(v)),
+        F32_TOL,
+    );
+    check(
+        &m,
+        "quat.cubic_time",
+        &v3(q.spherical_cubic_interpolate_in_time(&qb, &qpre, &qpost, 0.4, 1.0, -1.0, 2.0).xform(v)),
+        F32_TOL,
+    );
 }
 
 // ---------------------------------------------------------------------------

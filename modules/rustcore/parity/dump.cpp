@@ -178,6 +178,21 @@ int main() {
 		out("quat.slerp", q.slerp(q2, 0.35f).xform(v));
 		outf("quat.angle_to", q.angle_to(q2));
 		out("quat.euler", Quaternion::from_euler(Vector3(0.3f, -0.7f, 1.1f)).xform(v));
+		const Quaternion ql = q2.log();
+		printf("quat.log,%.9g,%.9g,%.9g,%.9g\n", (double)ql.x, (double)ql.y, (double)ql.z, (double)ql.w);
+		out("quat.exp", ql.exp().xform(v));
+		out("quat.slerpni", q2.slerpni(q, 0.35f).xform(v));
+		const EulerOrder kOrders[6] = { EulerOrder::XYZ, EulerOrder::XZY, EulerOrder::YXZ,
+				EulerOrder::YZX, EulerOrder::ZXY, EulerOrder::ZYX };
+		for (int i = 0; i < 6; i++) {
+			const Vector3 e = q.get_euler(kOrders[i]);
+			printf("quat.order%d,%.9g,%.9g,%.9g\n", i, (double)e.x, (double)e.y, (double)e.z);
+		}
+		const Quaternion qb = Quaternion(Vector3(0.0f, 1.0f, 0.0f), 1.0f);
+		const Quaternion qpre = Quaternion(Vector3(0.0f, 1.0f, 0.0f), -0.5f);
+		const Quaternion qpost = Quaternion(Vector3(0.0f, 1.0f, 0.0f), 1.5f);
+		out("quat.cubic", q.spherical_cubic_interpolate(qb, qpre, qpost, 0.4f).xform(v));
+		out("quat.cubic_time", q.spherical_cubic_interpolate_in_time(qb, qpre, qpost, 0.4f, 1.0f, -1.0f, 2.0f).xform(v));
 		out("basis.slerp", b.slerp(b.scaled_local(Vector3(2, 2, 2)), 0.5f).get_column(0));
 	}
 
