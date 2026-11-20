@@ -302,6 +302,67 @@ impl Curve2D {
         out
     }
 
+    /// `get_closest_point`: brute force over the baked segments, projecting the
+    /// query point onto each one.
+    pub fn get_closest_point(&mut self, p: Vector2) -> Vector2 {
+        if self.baked_dirty {
+            self.bake();
+        }
+        if self.baked_points.is_empty() {
+            return Vector2::ZERO;
+        }
+        if self.baked_points.len() == 1 {
+            return self.baked_points[0];
+        }
+        let r = &self.baked_points;
+        let dist = &self.baked_dist;
+        let mut nearest = Vector2::ZERO;
+        let mut nearest_dist = -1.0f32;
+
+        for i in 0..r.len() - 1 {
+            let interval = dist[i + 1] - dist[i];
+            let origin = r[i];
+            let direction = (r[i + 1] - origin) / interval;
+            let d = (p - origin).dot(direction).clamp(0.0, interval);
+            let proj = origin + direction * d;
+            let dsq = proj.distance_squared_to(p);
+            if nearest_dist < 0.0 || dsq < nearest_dist {
+                nearest = proj;
+                nearest_dist = dsq;
+            }
+        }
+        nearest
+    }
+
+    /// `get_closest_offset`: the same projection, returning the arc length.
+    pub fn get_closest_offset(&mut self, p: Vector2) -> f32 {
+        if self.baked_dirty {
+            self.bake();
+        }
+        if self.baked_points.len() < 2 {
+            return 0.0;
+        }
+        let r = &self.baked_points;
+        let dist = &self.baked_dist;
+        let mut nearest = 0.0f32;
+        let mut nearest_dist = -1.0f32;
+
+        for i in 0..r.len() - 1 {
+            let offset = dist[i];
+            let interval = dist[i + 1] - dist[i];
+            let origin = r[i];
+            let direction = (r[i + 1] - origin) / interval;
+            let d = (p - origin).dot(direction).clamp(0.0, interval);
+            let proj = origin + direction * d;
+            let dsq = proj.distance_squared_to(p);
+            if nearest_dist < 0.0 || dsq < nearest_dist {
+                nearest = offset + d;
+                nearest_dist = dsq;
+            }
+        }
+        nearest
+    }
+
     pub fn get_baked_length(&mut self) -> f32 {
         if self.baked_dirty {
             self.bake();
@@ -532,6 +593,31 @@ mod tests {
         assert_eq!(c.tessellate(0, 4.0).len(), 3);
         // With a tolerance that no turn exceeds, nothing is inserted.
         assert_eq!(c.tessellate(0, 179.0).len(), 2);
+    }
+
+    #[test]
+    fn closest_point_projects_onto_the_polyline() {
+        let mut c = straight(10.0);
+        // Beside the middle: projects to (5,0), offset 5.
+        let p = c.get_closest_point(Vector2::new(5.0, 3.0));
+        assert!((p - Vector2::new(5.0, 0.0)).length() < 1e-3, "{p:?}");
+        assert!((c.get_closest_offset(Vector2::new(5.0, 3.0)) - 5.0).abs() < 1e-3);
+
+        // Beyond the ends: clamps to the endpoints.
+        assert!((c.get_closest_point(Vector2::new(20.0, 0.0)) - Vector2::new(10.0, 0.0)).length() < 1e-3);
+        assert!((c.get_closest_offset(Vector2::new(20.0, 0.0)) - 10.0).abs() < 1e-3);
+        assert!((c.get_closest_point(Vector2::new(-5.0, 0.0))).length() < 1e-3);
+        assert!((c.get_closest_offset(Vector2::new(-5.0, 0.0))).abs() < 1e-3);
+    }
+
+    #[test]
+    fn closest_point_on_empty_and_single_point() {
+        let mut c = Curve2D::new();
+        assert_eq!(c.get_closest_point(Vector2::ONE), Vector2::ZERO);
+        assert_eq!(c.get_closest_offset(Vector2::ONE), 0.0);
+        c.add_point(Vector2::new(3.0, 4.0));
+        assert_eq!(c.get_closest_point(Vector2::ZERO), Vector2::new(3.0, 4.0));
+        assert_eq!(c.get_closest_offset(Vector2::ZERO), 0.0);
     }
 
     #[test]
