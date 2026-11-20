@@ -4,6 +4,7 @@
 //! those nodes own, so they can be verified before the object layer exists.
 
 pub mod canvas_item;
+pub mod curve;
 pub mod canvas_layer;
 pub mod node;
 pub mod node_2d;
