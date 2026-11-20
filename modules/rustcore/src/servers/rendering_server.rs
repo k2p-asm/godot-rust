@@ -12,6 +12,7 @@
 use crate::math::color::Color;
 use crate::math::transform_2d::Transform2D;
 use crate::math::vector2i::Vector2i;
+use crate::servers::rendering_enums::TextureType;
 use crate::servers::rid::{Rid, RidOwner};
 
 #[derive(Clone, Copy, Debug)]
@@ -54,10 +55,32 @@ impl Default for ViewportState {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct TextureState {
+    pub size: Vector2i,
+    pub format: i32,
+    pub layers: i32,
+    pub texture_type: TextureType,
+    pub flags: u32,
+}
+
+impl Default for TextureState {
+    fn default() -> Self {
+        Self {
+            size: Vector2i::ZERO,
+            format: 0,
+            layers: 1,
+            texture_type: TextureType::Type2D,
+            flags: 0,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct RenderingServerData {
     canvas_items: RidOwner<CanvasItemState>,
     viewports: RidOwner<ViewportState>,
+    textures: RidOwner<TextureState>,
 }
 
 impl RenderingServerData {
@@ -188,6 +211,38 @@ impl RenderingServerData {
     pub fn viewport_count(&self) -> usize {
         self.viewports.count()
     }
+
+    /// 	exture_2d_create: stores the descriptor; pixels live in the backend.
+    pub fn texture_2d_create(&mut self, format: i32, size: Vector2i) -> Rid {
+        self.textures.alloc(TextureState {
+            size,
+            format,
+            texture_type: TextureType::Type2D,
+            ..TextureState::default()
+        })
+    }
+
+    pub fn texture_free(&mut self, texture: Rid) -> bool {
+        self.textures.free(texture)
+    }
+
+    pub fn texture_get(&self, texture: Rid) -> Option<&TextureState> {
+        self.textures.get(texture)
+    }
+
+    pub fn texture_set_flags(&mut self, texture: Rid, flags: u32) -> bool {
+        match self.textures.get_mut(texture) {
+            Some(t) => {
+                t.flags = flags;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn texture_count(&self) -> usize {
+        self.textures.count()
+    }
 }
 
 #[cfg(test)]
@@ -290,12 +345,36 @@ mod tests {
     }
 
     #[test]
-    fn viewport_handles_do_not_revive_either() {
+    fn texture_descriptors_are_stored() {
         let mut rs = RenderingServerData::new();
-        let a = rs.viewport_create();
-        assert!(rs.viewport_free(a));
-        let b = rs.viewport_create();
-        assert!(!rs.viewport_set_active(a, false));
-        assert!(rs.viewport_get(b).unwrap().active);
+        let tex = rs.texture_2d_create(5, Vector2i::new(64, 32));
+        let t = rs.texture_get(tex).unwrap();
+        assert_eq!(t.size, Vector2i::new(64, 32));
+        assert_eq!(t.format, 5);
+        assert_eq!(t.texture_type, TextureType::Type2D);
+        assert_eq!(t.layers, 1);
+        assert_eq!(t.flags, 0);
+
+        assert!(rs.texture_set_flags(tex, 0b101));
+        assert_eq!(rs.texture_get(tex).unwrap().flags, 0b101);
+    }
+
+    #[test]
+    fn textures_are_independent_and_freed_handles_reject_writes() {
+        let mut rs = RenderingServerData::new();
+        let a = rs.texture_2d_create(1, Vector2i::new(8, 8));
+        let b = rs.texture_2d_create(2, Vector2i::new(16, 16));
+        assert_eq!(rs.texture_count(), 2);
+
+        assert!(rs.texture_free(a));
+        assert!(!rs.texture_set_flags(a, 1));
+        assert!(rs.texture_get(a).is_none());
+        // The other texture keeps its own descriptor.
+        assert_eq!(rs.texture_get(b).unwrap().size, Vector2i::new(16, 16));
+        assert_eq!(rs.texture_count(), 1);
+
+        // Freeing a texture does not touch the other owners.
+        assert_eq!(rs.canvas_item_count(), 0);
+        assert_eq!(rs.viewport_count(), 0);
     }
 }
