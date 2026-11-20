@@ -63,9 +63,17 @@ pub struct TrackKey {
 }
 
 #[derive(Clone, Debug)]
+pub struct MethodKey {
+    pub time: f64,
+    pub callable: crate::variant::Callable,
+    pub params: Vec<Variant>,
+}
+
+#[derive(Clone, Debug)]
 pub struct Track {
     pub track_type: TrackType,
     pub keys: Vec<TrackKey>,
+    pub method_keys: Vec<MethodKey>,
     pub interpolation: InterpolationType,
     pub loop_wrap: bool,
     pub path: StringName,
@@ -123,6 +131,7 @@ impl Animation {
         let track = Track {
             track_type,
             keys: Vec::new(),
+            method_keys: Vec::new(),
             interpolation: InterpolationType::Linear,
             loop_wrap: true,
             path: StringName::new(""),
@@ -474,6 +483,52 @@ impl Animation {
         Some(a.slerp(&b, w as f32))
     }
 
+    pub fn method_track_insert_key(
+        &mut self,
+        track: usize,
+        time: f64,
+        callable: crate::variant::Callable,
+        params: Vec<Variant>,
+    ) -> Option<usize> {
+        let t = self.tracks.get_mut(track)?;
+        let key = MethodKey {
+            time,
+            callable,
+            params,
+        };
+        if let Some(idx) = t.method_keys.iter().position(|k| k.time == time) {
+            t.method_keys[idx] = key;
+            return Some(idx);
+        }
+        t.method_keys.push(key);
+        t.method_keys.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
+        t.method_keys.iter().position(|k| k.time == time)
+    }
+
+    pub fn method_track_get_key_count(&self, track: usize) -> usize {
+        self.tracks
+            .get(track)
+            .map(|t| t.method_keys.len())
+            .unwrap_or(0)
+    }
+
+    pub fn method_track_get_key(
+        &self,
+        track: usize,
+        key: usize,
+    ) -> Option<(&crate::variant::Callable, &[Variant])> {
+        let k = self.tracks.get(track)?.method_keys.get(key)?;
+        Some((&k.callable, &k.params))
+    }
+
+    pub fn method_track_get_key_time(&self, track: usize, key: usize) -> Option<f64> {
+        self.tracks
+            .get(track)?
+            .method_keys
+            .get(key)
+            .map(|k| k.time)
+    }
+
     /// Numeric value type check used by the interpolator above.
     pub fn track_is_numeric(&self, track: usize) -> bool {
         match self.tracks.get(track) {
@@ -625,6 +680,45 @@ mod tests {
         // 45 degrees from identity.
         let angle = mid.angle_to(&Quaternion::IDENTITY);
         assert!((angle - std::f32::consts::FRAC_PI_4).abs() < 1e-3, "{angle}");
+    }
+
+    #[test]
+    fn method_track_keys_keep_time_order() {
+        use crate::variant::Callable;
+        let mut a = Animation::new();
+        let t = a.add_track(TrackType::Method, -1);
+        let cb = Callable {
+            object: crate::object::ObjectId::from_u64(7),
+            method: StringName::new("hit"),
+        };
+
+        assert_eq!(
+            a.method_track_insert_key(t, 1.0, cb.clone(), vec![Variant::Int(2)]),
+            Some(0)
+        );
+        assert_eq!(
+            a.method_track_insert_key(t, 0.0, cb.clone(), vec![]),
+            Some(0)
+        );
+        assert_eq!(
+            a.method_track_insert_key(t, 2.0, cb.clone(), vec![]),
+            Some(2)
+        );
+        assert_eq!(a.method_track_get_key_count(t), 3);
+
+        assert_eq!(a.method_track_get_key_time(t, 0), Some(0.0));
+        assert_eq!(a.method_track_get_key_time(t, 1), Some(1.0));
+        let (callable, params) = a.method_track_get_key(t, 1).unwrap();
+        assert_eq!(callable, &cb);
+        assert_eq!(params, &[Variant::Int(2)]);
+
+        // Same time replaces the key.
+        assert_eq!(
+            a.method_track_insert_key(t, 1.0, cb.clone(), vec![Variant::Int(9)]),
+            Some(1)
+        );
+        assert_eq!(a.method_track_get_key_count(t), 3);
+        assert_eq!(a.method_track_get_key(t, 1).unwrap().1, &[Variant::Int(9)]);
     }
 
     #[test]
