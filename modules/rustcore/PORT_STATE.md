@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1284 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1288 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -242,6 +242,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `io/file_access_helpers.rs` | `core/io/file_access.*` (buffer-backed helpers) | Endian-aware `get_8/16/32/64`, `get_float/double/real`, the matching `store_*` forms and `set_big_endian`; `get_buffer`/`store_buffer`, `seek`/`seek_end`, position/length and the sticky EOF flag; `get_line` (drops `\n` and a preceding `\r`), `get_as_text(skip_cr)`, `store_string`/`store_line`; `get_csv_line`/`store_csv_line` with quoted fields and doubled quotes. Platform files, compression and `get_var`/`store_var` not ported. **Non-differential** |
 | `io/file_access_memory.rs` | `core/io/file_access_memory.*` (registry analogue) | Named in-memory files: `register_file`/`file_exists`/`cleanup`, `open` (missing names fail like `ERR_FILE_NOT_FOUND`), `close`, `seek` (past-the-end rejected), `seek_end`, position/length/EOF, forward `get_buffer` and `store_buffer` (overwrite/append at the cursor). ProjectSettings path globalisation is not ported. **Non-differential** |
 | `scene/parallax_and_heightfield.rs` | `scene/2d/parallax_layer.*`, `scene/3d/gpu_particles_collision_3d.*` (height field) | ParallaxLayer motion scale/offset/mirroring; GPUParticlesCollisionHeightField3D's `(1 << 20) - 1` mask with 1..=32 bits, `(2,2,2)` size, six resolutions with the `MAX` guard, follow-camera flag, two update modes and the centred AABB. Base-offset computation and bake/render calls not ported. **Non-differential** |
+| `crypto/sha256.rs` | `core/crypto/sha256.*`, `core/crypto/crypto_core.*` (HMAC/compare) | SHA-256 with the incremental context, `sha256`/`sha256_hex`, HMAC-SHA256 with the 64-byte block (oversized keys hashed first) and the constant-time comparison. Verified against the NIST vectors (empty, abc, the two multi-block standards, 55 bytes) plus RFC 4231 HMAC cases and chunked updates. **Differential-grade vector tests** |
 | `crypto/md5.rs` | `core/crypto/md5.*` | RFC 1321 MD5: standard padding and length footer, the 64 sine-derived rounds with the four boolean functions, the incremental `Md5Context` (`update`/`finish`) and `md5`/`md5_hex`. Verified against the RFC test vectors, padding boundaries (55/56/64/65 bytes) and chunked updates. **Differential-grade vector tests** |\n| `version.rs` | `core/version.h` (+ `version.py`) | The engine version constants (4.7.2 stable; branch/number/hex/full-config/name, `version_hex`, the zero-patch formatting rule) and a `VersionInfo` parser/formatter/comparator (major.minor[.patch][.status][.build], ordering by the numeric triple only). Values follow the fork's `version.py`. **Non-differential** |
 | `os/os_info.rs` | `core/os/os.h` (metadata), `core/templates/pair.h` | `OS_NAME`, the `has_feature` set for the Windows x86_64 editor build (and the template variant), and `Pair<T, U>` with structural equality and ordering by first then second. Singleton calls, platform queries and thread/memory APIs are not ported. **Non-differential** |
 | `os/keyboard.rs` | `core/os/keyboard.h` (constants) | 194 `KEY_*` constants (including `SPECIAL = 1 << 22` and the special-key block), the nine `KEY_MASK_*` modifier bits, `key_code`, `is_modifier_key` (the lock/modifier key codes) and the `KeyLocation` ints/conversion. The table is generated from the header by a porting script; the macOS-only `CMD_OR_CTRL` branch is resolved to the non-macOS value. Keycode name/string helpers not ported. **Non-differential** |
@@ -375,9 +376,6 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 
 ## Marked pending, with the reason
 
-- **Pack files** (`core/io/file_access_pack.*`, `core/io/pck_packer.*`): require
-  the MD5 implementation from `core/crypto` (the pack directory keys and file
-  hashes are MD5 digests) and the engine's encryption hooks; not started.
 - **`core/variant/variant_utility.*`**: the numeric half is ported; the
   array/string/type-conversion/print/object helpers are pending.
 
