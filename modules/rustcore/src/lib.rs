@@ -18,4 +18,5 @@ pub mod os;
 pub mod scene;
 pub mod servers;
 pub mod variant;
+pub mod version;
 pub mod templates;
