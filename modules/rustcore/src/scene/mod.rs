@@ -62,6 +62,7 @@ pub mod shapes_3d;
 pub mod skeleton_3d;
 pub mod skeleton_profile;
 pub mod skin;
+pub mod sky;
 pub mod scroll_container;
 pub mod node_2d;
 pub mod node_3d;
