@@ -53,6 +53,7 @@ pub mod resource_extras;
 pub mod scene_tree;
 pub mod shader;
 pub mod shapes_2d;
+pub mod skeleton_3d;
 pub mod skeleton_profile;
 pub mod skin;
 pub mod scroll_container;
