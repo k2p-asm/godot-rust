@@ -21,6 +21,7 @@ pub mod random_number_generator;
 pub mod plane;
 pub mod projection;
 pub mod quaternion;
+pub mod quick_hull;
 pub mod rng;
 pub mod rect2;
 pub mod rect2i;

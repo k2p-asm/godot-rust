@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1121 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1128 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -209,6 +209,7 @@ optimisation-fitted polynomial - any "cleanup" changes the result.
 | `math/geometry_3d.rs` | `core/math/geometry_3d.h` | 2 triangle tests, sphere/cylinder/convex segment tests, closest point on segment, barycentric coords, `point_in_projected_triangle`, `triangle_sphere_intersection_test`, `clip_polygon`, `get_support`, `project_range`, `get_closest_points_between_segments` + distance, `build_box_planes`, `build_cylinder_planes` (sides + caps), `build_sphere_planes`, `build_capsule_planes`, `compute_convex_mesh_points`, all verified |
 | `math/geometry_2d.rs` | `core/math/geometry_2d.h` | hit tests + `vec2_cross`, `convex_hull` (verified: 5 points, first repeated), `bresenham_line` (verified) |
 | `ffi.rs` | (new) | `gcr_variant_nil/bool/int/float/vector3`, `gcr_variant_type/as_int/as_float/as_vector3/booleanize`; verified inside the engine build (prints `variant tag = 2, truthy = 1` and `Rust packed sum = 256`) | **old**: C ABI: `gcr_abi_version`, `gcr_vector3_dot`, `gcr_vector3_normalized`, `gcr_transform3d_xform` |
+| `math/quick_hull.rs` | `core/math/quick_hull.*` | Incremental convex hull: AABB rejection, duplicate removal by `snappedf(0.0001)`, the deterministic 4-point simplex (extreme on the longest axis, furthest from that line, furthest from the plane), outward-facing seed faces with the simplex-centre flip, the `3*UNIT_EPSILON*(sx+sy+sz)` over-tolerance, point distribution, and the lit-face/horizon-edge expansion loop with an iteration cap (`build_with_limit`). Coplanar output faces stay triangulated (the engine's merge pass is documented as the deviation); faces/unique edges returned. Tests cover a tetrahedron, a cube (12 faces/18 edges, all corners), duplicates, interior points, degenerate input and the stop limit. **Non-differential** |
 | `templates/ring_buffer.rs` | `core/templates/ring_buffer.h` | Power-of-two buffer with masked cursors and one reserved slot: `read`/`read_into` (clamped, optional advance), `copy_into` (offset-relative, non-consuming), `find` (offset-relative index, `-1` absent, `0` for an empty range), `advance_read`, `decrease_write`, single and slice `write`, `space_left`/`data_left`/`size`, `clear` and the exact `resize` relocation path for wrapped data. **Non-differential** |
 | `templates/lru.rs` | `core/templates/lru.h` | Front-ordered LRU with `insert` (replacing a key, trimming from the tail), `get`/`get_ptr` recency updates, `peek`, `erase`/`clear`, and the engine's capacity rules (default 64, `set_capacity` ignored at zero). **Non-differential** |
 | `math/rng.rs` | `core/math/random_number_generator.*` | Seed/state accessors, `randomize`, and the six draws (`randi` raw bits, `randf`, inclusive `randf_range`/`randi_range` with bounds swap, `randfn`, `rand_weighted`) delegating to the verified `RandomPcg`. The constructor randomizes like the engine; `with_seed` exists for deterministic tests. **Non-differential** |
