@@ -39,6 +39,7 @@ pub mod range;
 pub mod resource_extras;
 pub mod scene_tree;
 pub mod shapes_2d;
+pub mod skin;
 pub mod scroll_container;
 pub mod node_2d;
 pub mod node_3d;
