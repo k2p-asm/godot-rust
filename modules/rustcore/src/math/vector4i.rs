@@ -61,8 +61,10 @@ impl Vector4i {
         fn s(v: i32) -> i32 {
             if v < 0 {
                 -1
-            } else {
+            } else if v > 0 {
                 1
+            } else {
+                0
             }
         }
         Self::new(s(self.x), s(self.y), s(self.z), s(self.w))

@@ -115,8 +115,10 @@ impl Vector3i {
         fn s(v: i32) -> i32 {
             if v < 0 {
                 -1
-            } else {
+            } else if v > 0 {
                 1
+            } else {
+                0
             }
         }
         Self::new(s(self.x), s(self.y), s(self.z))
@@ -266,7 +268,7 @@ mod tests {
         assert_eq!(a * 2, Vector3i::new(2, -4, 6));
         assert_eq!(a.abs(), Vector3i::new(1, 2, 3));
         assert_eq!(a.sign(), Vector3i::new(1, -1, 1));
-        assert_eq!(Vector3i::new(5, 0, -5).sign(), Vector3i::new(1, 1, -1));
+        assert_eq!(Vector3i::new(5, 0, -5).sign(), Vector3i::new(1, 0, -1));
         assert_eq!(a.min(b), Vector3i::new(1, -2, -6));
         assert_eq!(a.max(b), Vector3i::new(4, 5, 3));
     }

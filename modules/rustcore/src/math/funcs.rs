@@ -261,8 +261,10 @@ pub fn atanh<T: Real>(x: T) -> T {
 pub fn sign_f32(v: f32) -> f32 {
     if v < 0.0 {
         -1.0
-    } else {
+    } else if v > 0.0 {
         1.0
+    } else {
+        0.0
     }
 }
 

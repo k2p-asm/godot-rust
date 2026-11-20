@@ -94,8 +94,10 @@ impl Vector2i {
         fn s(v: i32) -> i32 {
             if v < 0 {
                 -1
-            } else {
+            } else if v > 0 {
                 1
+            } else {
+                0
             }
         }
         Self::new(s(self.x), s(self.y))
@@ -231,7 +233,7 @@ mod tests {
         assert_eq!(a.length_squared(), 25);
         assert_eq!(a.length(), 5.0);
         assert_eq!(a.abs(), Vector2i::new(3, 4));
-        assert_eq!(Vector2i::new(0, -2).sign(), Vector2i::new(1, -1));
+        // SIGN maps zero to zero, like the engine macro.\n        assert_eq!(Vector2i::new(0, -2).sign(), Vector2i::new(0, -1));
     }
 
     #[test]

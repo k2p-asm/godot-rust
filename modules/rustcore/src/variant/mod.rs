@@ -12,6 +12,7 @@
 pub mod compare;
 pub mod ops;
 pub mod serial;
+pub mod utility;
 
 use crate::math::aabb::Aabb;
 use crate::math::basis::Basis;
