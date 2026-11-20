@@ -69,6 +69,7 @@ pub mod line_edit;
 pub mod label_settings;
 pub mod light_2d;
 pub mod light_3d;
+pub mod light_nodes_2d;
 pub mod lightmap_gi;
 pub mod physical_bone_3d;
 pub mod light_occluder_2d;
