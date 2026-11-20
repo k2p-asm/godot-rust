@@ -131,10 +131,10 @@ pub fn unix_time_from_datetime_string(text: &str) -> Option<i64> {
     let hour = part(11, 2)?;
     let minute = part(14, 2)?;
     let second = part(17, 2)?;
-    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+    if !(1..=12).contains(&month) || !(1..=days_in_month(year, month)).contains(&day) {
         return None;
     }
-    if !(0..=23).contains(&hour) || !(0..=59).contains(&minute) || !(0..=60).contains(&second) {
+    if !(0..=23).contains(&hour) || !(0..=59).contains(&minute) || !(0..=59).contains(&second) {
         return None;
     }
     Some(
@@ -150,6 +150,84 @@ pub fn offset_string_from_offset_minutes(minutes: i64) -> String {
     let sign = if minutes < 0 { '-' } else { '+' };
     let abs = minutes.abs();
     format!("{}{:02}:{:02}", sign, abs / 60, abs % 60)
+}
+
+/// Days in `month` (1..=12) for the given year (proleptic Gregorian).
+pub fn days_in_month(year: i32, month: i32) -> i32 {
+    const DAYS: [i32; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if month == 2 && is_leap_year(year) {
+        29
+    } else {
+        DAYS[(month.clamp(1, 12) - 1) as usize]
+    }
+}
+
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+/// The engine's `VALIDATE_YMDHMS` checks for the dictionary/string forms.
+pub fn validate_ymdhms(
+    _year: i32,
+    month: i32,
+    day: i32,
+    hour: i32,
+    minute: i32,
+    second: i32,
+) -> bool {
+    if month < 1 || month > 12 {
+        return false;
+    }
+    if day < 1 || day > days_in_month(_year, month) {
+        return false;
+    }
+    (0..=23).contains(&hour) && (0..=59).contains(&minute) && (0..=59).contains(&second)
+}
+
+/// `get_datetime_string_from_datetime_dict`: the canonical string, or `None`
+/// when a field is out of range.
+pub fn datetime_string_from_datetime_dict(
+    year: i32,
+    month: i32,
+    day: i32,
+    hour: i32,
+    minute: i32,
+    second: i32,
+    use_space: bool,
+) -> Option<String> {
+    if !validate_ymdhms(year, month, day, hour, minute, second) {
+        return None;
+    }
+    Some(format!(
+        "{:04}-{:02}-{:02}{}{:02}:{:02}:{:02}",
+        year,
+        month,
+        day,
+        if use_space { ' ' } else { 'T' },
+        hour,
+        minute,
+        second
+    ))
+}
+
+/// `get_unix_time_from_datetime_dict`: `None` when a field is out of range.
+pub fn unix_time_from_datetime_dict(
+    year: i32,
+    month: i32,
+    day: i32,
+    hour: i32,
+    minute: i32,
+    second: i32,
+) -> Option<i64> {
+    if !validate_ymdhms(year, month, day, hour, minute, second) {
+        return None;
+    }
+    Some(
+        days_from_civil(year, month, day) * 86400
+            + hour as i64 * 3600
+            + minute as i64 * 60
+            + second as i64,
+    )
 }
 
 #[cfg(test)]
@@ -218,5 +296,80 @@ mod tests {
         assert_eq!(offset_string_from_offset_minutes(330), "+05:30");
         assert_eq!(offset_string_from_offset_minutes(-480), "-08:00");
         assert_eq!(offset_string_from_offset_minutes(-45), "-00:45");
+    }
+
+    #[test]
+    fn month_lengths() {
+        assert_eq!(days_in_month(2023, 1), 31);
+        assert_eq!(days_in_month(2023, 2), 28);
+        assert_eq!(days_in_month(2024, 2), 29);
+        assert_eq!(days_in_month(1900, 2), 28);
+        assert_eq!(days_in_month(2000, 2), 29);
+        assert_eq!(days_in_month(2023, 4), 30);
+        assert_eq!(days_in_month(2023, 12), 31);
+        assert_eq!(days_in_month(2023, 0), 31, "clamped to January");
+        assert_eq!(days_in_month(2023, 13), 31, "clamped to December");
+    }
+
+    #[test]
+    fn datetime_dict_conversions() {
+        assert_eq!(
+            datetime_string_from_datetime_dict(1970, 1, 1, 0, 0, 0, false).as_deref(),
+            Some("1970-01-01T00:00:00")
+        );
+        assert_eq!(
+            datetime_string_from_datetime_dict(2020, 1, 2, 3, 4, 5, true).as_deref(),
+            Some("2020-01-02 03:04:05")
+        );
+        assert_eq!(unix_time_from_datetime_dict(1970, 1, 1, 0, 0, 0), Some(0));
+        assert_eq!(
+            unix_time_from_datetime_dict(2001, 9, 9, 1, 46, 40),
+            Some(1_000_000_000)
+        );
+        // Leap day.
+        assert!(unix_time_from_datetime_dict(2024, 2, 29, 12, 0, 0).is_some());
+        // Dictionary and string forms agree.
+        let dict_stamp = unix_time_from_datetime_dict(2020, 1, 2, 3, 4, 5).unwrap();
+        assert_eq!(
+            unix_time_from_datetime_string("2020-01-02T03:04:05"),
+            Some(dict_stamp)
+        );
+        // Round trip through the broken-down form.
+        let datetime = datetime_from_unix_time(1_700_000_000);
+        assert_eq!(
+            unix_time_from_datetime_dict(
+                datetime.year,
+                datetime.month,
+                datetime.day,
+                datetime.hour,
+                datetime.minute,
+                datetime.second
+            ),
+            Some(1_700_000_000)
+        );
+    }
+
+    #[test]
+    fn invalid_datetime_dict_fields_are_rejected() {
+        let valid = (2023, 1, 1, 0, 0, 0);
+        assert!(validate_ymdhms(valid.0, valid.1, valid.2, valid.3, valid.4, valid.5));
+        // Month.
+        assert!(!validate_ymdhms(2023, 0, 1, 0, 0, 0));
+        assert!(!validate_ymdhms(2023, 13, 1, 0, 0, 0));
+        // Day (including month-specific maxima).
+        assert!(!validate_ymdhms(2023, 1, 0, 0, 0, 0));
+        assert!(!validate_ymdhms(2023, 2, 29, 0, 0, 0));
+        assert!(validate_ymdhms(2024, 2, 29, 0, 0, 0));
+        assert!(!validate_ymdhms(2023, 4, 31, 0, 0, 0));
+        // Time fields (leap seconds are rejected).
+        assert!(!validate_ymdhms(2023, 1, 1, 24, 0, 0));
+        assert!(!validate_ymdhms(2023, 1, 1, 0, 60, 0));
+        assert!(!validate_ymdhms(2023, 1, 1, 0, 0, 60));
+        assert_eq!(datetime_string_from_datetime_dict(2023, 2, 29, 0, 0, 0, false), None);
+        assert_eq!(unix_time_from_datetime_dict(2023, 2, 29, 0, 0, 0), None);
+        // The string parser uses the same month length rules now.
+        assert_eq!(unix_time_from_datetime_string("2023-02-29T00:00:00"), None);
+        assert_eq!(unix_time_from_datetime_string("2023-04-31T00:00:00"), None);
+        assert_eq!(unix_time_from_datetime_string("2023-01-01T00:00:60"), None);
     }
 }
