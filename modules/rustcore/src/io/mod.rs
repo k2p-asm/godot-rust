@@ -11,6 +11,7 @@ pub mod ip_address;
 pub mod json;
 pub mod logger;
 pub mod marshalls;
+pub mod net_socket;
 pub mod packet_peer;
 pub mod packed_data_container;
 pub mod json_native;
