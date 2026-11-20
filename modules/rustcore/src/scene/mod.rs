@@ -83,6 +83,7 @@ pub mod mesh_instance_3d;
 pub mod mesh_library;
 pub mod multimesh;
 pub mod multimesh_instance_3d;
+pub mod navigation_agent_2d;
 pub mod navigation_agent_3d;
 pub mod navigation_mesh;
 pub mod navigation_nodes_3d;
