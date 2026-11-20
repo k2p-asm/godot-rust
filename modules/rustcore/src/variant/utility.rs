@@ -651,6 +651,45 @@ pub fn max(a: &Variant, b: &Variant) -> UtilityResult {
     }
 }
 
+// -- string conversions ------------------------------------------------------
+
+/// `str_to_var`: parses a variant expression (`[1, "two"]`, `{"k": 3}`, ...)
+/// through the ported variant parser; `Nil` on a parse error (the engine
+/// returns a nil variant too).
+pub fn str_to_var(text: &str) -> Variant {
+    crate::io::variant_parser::parse(text).unwrap_or(Variant::Nil)
+}
+
+/// `str_to_var` with the error preserved (port-side helper).
+pub fn str_to_var_checked(
+    text: &str,
+) -> Result<Variant, crate::io::variant_parser::ParseError> {
+    crate::io::variant_parser::parse(text)
+}
+
+/// `var_to_str`: the canonical text form produced by the ported writer.
+pub fn var_to_str(value: &Variant) -> String {
+    crate::io::variant_parser::write_variant(value)
+}
+
+/// `type_convert`: the numeric/string core of the engine's conversion table.
+/// Unsupported targets report the expected type.
+pub fn type_convert(value: &Variant, target: VariantType) -> UtilityResult {
+    match target {
+        VariantType::Nil => Ok(Variant::Nil),
+        VariantType::Bool => Ok(Variant::Bool(value.booleanize())),
+        VariantType::Int => Ok(Variant::Int(value.to_int())),
+        VariantType::Float => Ok(Variant::Float(value.to_float())),
+        VariantType::String => Ok(Variant::String(crate::string::gstring::GoString::from_str(
+            &var_to_str(value),
+        ))),
+        VariantType::StringName => Ok(Variant::String(crate::string::gstring::GoString::from_str(
+            &var_to_str(value),
+        ))),
+        other => Err(invalid(1, other)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
