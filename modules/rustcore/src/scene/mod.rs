@@ -11,3 +11,4 @@ pub mod gradient;
 pub mod canvas_layer;
 pub mod node;
 pub mod node_2d;
+pub mod sprite_2d;
