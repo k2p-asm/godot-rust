@@ -95,6 +95,7 @@ pub mod environment;
 pub mod gradient;
 pub mod gradient_texture;
 pub mod grid_container;
+pub mod gpu_particles_2d;
 pub mod gui_buttons;
 pub mod gui_indicators;
 pub mod gui_misc;
