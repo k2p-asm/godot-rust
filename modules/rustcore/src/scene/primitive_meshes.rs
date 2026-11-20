@@ -584,6 +584,94 @@ fn push_quad(indices: &mut Vec<i32>, a: i32, b: i32, c: i32, d: i32, e: i32, f: 
     indices.push(f);
 }
 
+/// `SphereMesh::create_mesh_array`.
+pub fn generate_sphere_arrays(
+    radius: f32,
+    height: f32,
+    radial_segments: i32,
+    rings: i32,
+    is_hemisphere: bool,
+    add_uv2: bool,
+    uv2_padding: f32,
+) -> GeneratedArrays {
+    let tau = std::f32::consts::TAU;
+    let pi = std::f32::consts::PI;
+    let scale = height / radius * if is_hemisphere { 1.0 } else { 0.5 };
+
+    let circumference = radius * tau;
+    let horizontal_length = circumference + uv2_padding;
+    let center_h = 0.5 * circumference / horizontal_length;
+    let height_v = scale * pi / ((scale * pi) + uv2_padding / radius);
+
+    let mut arrays = GeneratedArrays::default();
+    let mut uv2s: Vec<crate::math::vector2::Vector2> = Vec::new();
+    let mut point = 0i32;
+    let mut thisrow = 0i32;
+    let mut prevrow = 0i32;
+
+    for j in 0..=(rings + 1) {
+        let mut v = j as f32;
+        v /= (rings + 1) as f32;
+        let (w, y) = if j == rings + 1 {
+            (0.0, -1.0)
+        } else {
+            ((pi * v).sin(), (pi * v).cos())
+        };
+
+        for i in 0..=radial_segments {
+            let mut u = i as f32;
+            u /= radial_segments as f32;
+            let (x, z) = if i == radial_segments {
+                (0.0, 1.0)
+            } else {
+                ((u * tau).sin(), (u * tau).cos())
+            };
+
+            if is_hemisphere && y < 0.0 {
+                arrays
+                    .points
+                    .push(Vector3::new(x * radius * w, 0.0, z * radius * w));
+                arrays.normals.push(Vector3::new(0.0, -1.0, 0.0));
+            } else {
+                let p = Vector3::new(x * w, y * scale, z * w);
+                arrays.points.push(p * radius);
+                arrays.normals.push(
+                    Vector3::new(x * w * scale, y, z * w * scale).normalized(),
+                );
+            }
+            arrays.tangents.extend_from_slice(&[z, 0.0, -x, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(u, v));
+            if add_uv2 {
+                let w_h = w * 2.0 * center_h;
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    center_h + ((u - 0.5) * w_h),
+                    v * height_v,
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j > 0 {
+                arrays.indices.push(prevrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i);
+                arrays.indices.push(thisrow + i - 1);
+            }
+        }
+
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    if add_uv2 {
+        arrays.uv2s = uv2s;
+    }
+    arrays
+}
+
 #[derive(Clone, Debug)]
 pub struct PlaneMeshData {
     pub params: PrimitiveMeshParams,
@@ -1154,5 +1242,34 @@ mod tests {
         assert!(arrays.points.iter().all(|p| {
             p.x.abs() <= 1.0 + 1e-6 && p.y.abs() <= 1.0 + 1e-6 && p.z.abs() <= 1.0 + 1e-6
         }));
+    }
+
+    #[test]
+    fn sphere_arrays_counts() {
+        let a = generate_sphere_arrays(0.5, 1.0, 8, 4, false, false, 0.0);
+        assert_eq!(a.points.len(), (4 + 2) * (8 + 1));
+        assert_eq!(a.indices.len(), (4 + 1) * 8 * 6);
+        assert_eq!(a.normals.len(), a.points.len());
+        assert_eq!(a.tangents.len(), a.points.len() * 4);
+        assert_eq!(a.uvs.len(), a.points.len());
+        assert!(a.uv2s.is_empty());
+        assert!(a.indices.iter().all(|&i| (0..a.points.len() as i32).contains(&i)));
+        // Every normal is unit length (the degenerate rows keep the polar direction).
+        assert!(a.normals.iter().all(|n| (n.length() - 1.0).abs() < 1e-4 || n.length() < 1e-6));
+    }
+
+    #[test]
+    fn sphere_arrays_hemisphere_and_uv2() {
+        let a = generate_sphere_arrays(1.0, 2.0, 6, 3, true, true, 0.1);
+        assert_eq!(a.uv2s.len(), a.points.len());
+        // The hemisphere clamps the lower half to y=0 with a -Y normal.
+        let flat = a
+            .points
+            .iter()
+            .zip(a.normals.iter())
+            .filter(|(p, n)| p.y.abs() < 1e-6 && **n == Vector3::new(0.0, -1.0, 0.0))
+            .count();
+        assert!(flat > 0, "hemisphere bottom is flattened");
+        assert!(a.points.iter().all(|p| p.y >= -1e-6));
     }
 }
