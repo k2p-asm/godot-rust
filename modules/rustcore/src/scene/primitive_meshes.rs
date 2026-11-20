@@ -875,6 +875,186 @@ pub fn generate_cylinder_arrays(
     arrays
 }
 
+/// `CapsuleMesh::create_mesh_array`.
+pub fn generate_capsule_arrays(
+    radius: f32,
+    height: f32,
+    radial_segments: i32,
+    rings: i32,
+    add_uv2: bool,
+    uv2_padding: f32,
+) -> GeneratedArrays {
+    let tau = std::f32::consts::TAU;
+    let half_pi = 0.5 * std::f32::consts::PI;
+    let onethird = 1.0f32 / 3.0;
+    let twothirds = 2.0f32 / 3.0;
+
+    let radial_width = 2.0 * radius * std::f32::consts::PI;
+    let radial_h = radial_width / (radial_width + uv2_padding);
+    let radial_length = radius * std::f32::consts::PI * 0.5;
+    let vertical_length = radial_length * 2.0 + (height - 2.0 * radius) + uv2_padding;
+    let radial_v = radial_length / vertical_length;
+    let height_v = (height - 2.0 * radius) / vertical_length;
+
+    let mut arrays = GeneratedArrays::default();
+    let mut uv2s: Vec<crate::math::vector2::Vector2> = Vec::new();
+    let mut point = 0i32;
+    let mut thisrow = 0i32;
+    let mut prevrow = 0i32;
+
+    // Top hemisphere.
+    for j in 0..=(rings + 1) {
+        let v = j as f32 / (rings + 1) as f32;
+        let (w, y) = if j == rings + 1 {
+            (1.0, 0.0)
+        } else {
+            ((half_pi * v).sin(), (half_pi * v).cos())
+        };
+
+        for i in 0..=radial_segments {
+            let u = i as f32 / radial_segments as f32;
+            let (x, z) = if i == radial_segments {
+                (0.0, 1.0)
+            } else {
+                (-(u * tau).sin(), (u * tau).cos())
+            };
+
+            let p = Vector3::new(x * w, y, -z * w);
+            arrays.points.push(
+                p * radius + Vector3::new(0.0, 0.5 * height - radius, 0.0),
+            );
+            arrays.normals.push(p);
+            arrays.tangents.extend_from_slice(&[-z, 0.0, -x, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(u, v * onethird));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    u * radial_h,
+                    v * radial_v,
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j > 0 {
+                arrays.indices.push(prevrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i);
+                arrays.indices.push(thisrow + i - 1);
+            }
+        }
+
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    // Cylinder band.
+    thisrow = point;
+    prevrow = 0;
+    for j in 0..=(rings + 1) {
+        let v = j as f32 / (rings + 1) as f32;
+        let y = (0.5 * height - radius) - ((height - 2.0 * radius) * v);
+
+        for i in 0..=radial_segments {
+            let u = i as f32 / radial_segments as f32;
+            let (x, z) = if i == radial_segments {
+                (0.0, 1.0)
+            } else {
+                (-(u * tau).sin(), (u * tau).cos())
+            };
+
+            arrays.points.push(Vector3::new(x * radius, y, -z * radius));
+            arrays.normals.push(Vector3::new(x, 0.0, -z));
+            arrays.tangents.extend_from_slice(&[-z, 0.0, -x, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(
+                    u,
+                    onethird + (v * onethird),
+                ));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    u * radial_h,
+                    radial_v + (v * height_v),
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j > 0 {
+                arrays.indices.push(prevrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i);
+                arrays.indices.push(thisrow + i - 1);
+            }
+        }
+
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    // Bottom hemisphere.
+    thisrow = point;
+    prevrow = 0;
+    for j in 0..=(rings + 1) {
+        let v = j as f32 / (rings + 1) as f32;
+        let (w, y) = if j == rings + 1 {
+            (0.0, -1.0)
+        } else {
+            ((half_pi * v).cos(), -(half_pi * v).sin())
+        };
+
+        for i in 0..=radial_segments {
+            let u = i as f32 / radial_segments as f32;
+            let (x, z) = if i == radial_segments {
+                (0.0, 1.0)
+            } else {
+                (-(u * tau).sin(), (u * tau).cos())
+            };
+
+            let p = Vector3::new(x * w, y, -z * w);
+            arrays.points.push(
+                p * radius + Vector3::new(0.0, -0.5 * height + radius, 0.0),
+            );
+            arrays.normals.push(p);
+            arrays.tangents.extend_from_slice(&[-z, 0.0, -x, 1.0]);
+            arrays
+                .uvs
+                .push(crate::math::vector2::Vector2::new(
+                    u,
+                    twothirds + v * onethird,
+                ));
+            if add_uv2 {
+                uv2s.push(crate::math::vector2::Vector2::new(
+                    u * radial_h,
+                    radial_v + height_v + v * radial_v,
+                ));
+            }
+            point += 1;
+
+            if i > 0 && j > 0 {
+                arrays.indices.push(prevrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i - 1);
+                arrays.indices.push(prevrow + i);
+                arrays.indices.push(thisrow + i);
+                arrays.indices.push(thisrow + i - 1);
+            }
+        }
+
+        prevrow = thisrow;
+        thisrow = point;
+    }
+
+    if add_uv2 {
+        arrays.uv2s = uv2s;
+    }
+    arrays
+}
+
 #[derive(Clone, Debug)]
 pub struct PlaneMeshData {
     pub params: PrimitiveMeshParams,
@@ -1525,5 +1705,32 @@ mod tests {
         let mut sphere = SphereMeshData::new();
         sphere.set_radial_segments(2);
         assert_eq!(sphere.get_radial_segments(), 4);
+    }
+
+    #[test]
+    fn capsule_arrays_counts_and_extents() {
+        // Three sections of (rings+2)*(radial+1) vertices.
+        let a = generate_capsule_arrays(0.5, 2.0, 8, 4, false, 0.0);
+        assert_eq!(a.points.len(), (4 + 2) * (8 + 1) * 3);
+        assert_eq!(a.indices.len(), 3 * (4 + 1) * 8 * 6);
+        assert!(a.uv2s.is_empty());
+
+        // The top row is the upper pole at +height/2, the last row the lower pole.
+        assert!((a.points[0].y - 1.0).abs() < 1e-6);
+        let last = *a.points.last().unwrap();
+        assert!((last.y + 1.0).abs() < 1e-6);
+        // Normals are unit vectors on the sphere.
+        assert!(a.normals.iter().all(|n| (n.length() - 1.0).abs() < 1e-5));
+
+        // The band spans the straight section between the hemispheres.
+        let band_start = (4 + 2) * (8 + 1);
+        assert!((a.points[band_start].y - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn capsule_arrays_uv2() {
+        let a = generate_capsule_arrays(0.5, 2.0, 8, 4, true, 0.1);
+        assert_eq!(a.uv2s.len(), a.points.len());
+        assert!(a.uv2s.iter().all(|uv| uv.x >= 0.0 && uv.y >= 0.0));
     }
 }
