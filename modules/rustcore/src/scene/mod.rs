@@ -7,6 +7,7 @@ pub mod canvas_item;
 pub mod curve;
 pub mod curve_2d;
 pub mod curve_3d;
+pub mod gradient;
 pub mod canvas_layer;
 pub mod node;
 pub mod node_2d;
