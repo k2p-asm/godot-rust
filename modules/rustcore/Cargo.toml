@@ -1,0 +1,16 @@
+[package]
+name = "godot_core_rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Rust reimplementation of Godot 4.7.2 core subsystems (forked engine)"
+
+[lib]
+name = "godot_core_rs"
+path = "src/lib.rs"
+crate-type = ["rlib", "staticlib"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

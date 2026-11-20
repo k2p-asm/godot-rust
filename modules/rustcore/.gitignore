@@ -1,0 +1,7 @@
+# Cargo output and the parity harness binaries.
+/target/
+/parity/*.exe
+/parity/*.pdb
+/scons_check/*.exe
+/scons_check/*.obj
+/scons_check/.sconsign.dblite

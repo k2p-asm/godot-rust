@@ -1,0 +1,15 @@
+# Mimics the module wiring in `modules/rustcore/SCsub`: declare a dependency on
+# the Rust static library and link it into a C++ program.
+import os
+import sys
+
+env = Environment(ENV=os.environ)
+
+rust_lib = File(os.path.join("..", "target", "release", "godot_core_rs.lib"))
+env.Prepend(LIBS=[rust_lib])
+
+if sys.platform == "win32":
+    # System libraries that Rust's std requires when linking a staticlib.
+    env.Append(LIBS=["ws2_32", "advapi32", "userenv", "ntdll", "bcrypt", "ole32", "shell32", "kernel32"])
+
+env.Program("abi_check.cpp")

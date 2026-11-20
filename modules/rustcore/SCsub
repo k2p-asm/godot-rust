@@ -1,0 +1,6 @@
+# The Rust crate is built and linked from `config.py` (which has the global
+# environment), not here.
+Import("env")
+
+# Only this module's registration source is compiled; the math lives in Rust.
+env.add_source_files(env.modules_sources, "*.cpp")
