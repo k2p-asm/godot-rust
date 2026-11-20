@@ -5,6 +5,7 @@
 
 pub mod camera_2d;
 pub mod animation;
+pub mod animation_library;
 pub mod animation_mixer;
 pub mod animation_player;
 pub mod box_container;
