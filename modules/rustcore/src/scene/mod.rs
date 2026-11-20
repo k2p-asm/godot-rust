@@ -71,3 +71,4 @@ pub mod visible_on_screen_notifier_2d;
 pub mod visible_on_screen_notifier_3d;
 pub mod world_environment;
 pub mod visual_instance_3d;
+pub mod volumes_3d;
