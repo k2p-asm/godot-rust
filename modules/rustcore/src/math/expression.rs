@@ -55,6 +55,7 @@ enum Node {
     Var(String),
     SelfRef,
     Member(Box<Node>, String),
+    MethodCall(Box<Node>, String, Vec<Node>),
     Array(Vec<Node>),
     Dict(Vec<(Node, Node)>),
     Unary(UnOp, Box<Node>),
@@ -404,10 +405,8 @@ impl Parser {
                 };
                 node = Node::Member(Box::new(node), name);
             } else if self.eat_op("(") {
-                let name = match &node {
-                    Node::Var(n) => n.clone(),
-                    _ => return Err("Only named functions can be called".into()),
-                };
+                // Parse the argument list first: both named functions and
+                // object methods share it.
                 let mut args = Vec::new();
                 if !self.eat_op(")") {
                     loop {
@@ -419,7 +418,15 @@ impl Parser {
                         break;
                     }
                 }
-                node = Node::Call(name, args);
+                node = match node {
+                    Node::Var(name) => Node::Call(name, args),
+                    Node::Member(base, method) => Node::MethodCall(base, method, args),
+                    _ => {
+                        return Err(
+                            "Only named functions and object methods can be called".into(),
+                        )
+                    }
+                };
             } else {
                 break;
             }
@@ -590,6 +597,18 @@ fn eval(node: &Node, inputs: &HashMap<String, Variant>) -> Result<Variant, Strin
                 values.push(eval(a, inputs)?);
             }
             call_builtin(name, &values)
+        }
+        Node::MethodCall(base, method, args) => {
+            let object = eval(base, inputs)?;
+            let Variant::Object(id) = object else {
+                return Err("Method call needs an object".into());
+            };
+            let mut values = Vec::with_capacity(args.len());
+            for a in args {
+                values.push(eval(a, inputs)?);
+            }
+            crate::object::class_db::call(id, method, values)
+                .map_err(|e| format!("Method call failed: {e:?}"))
         }
         Node::Index(container, index) => {
             let c = eval(container, inputs)?;
@@ -1008,6 +1027,35 @@ mod tests {
         // `self` without a bound object errors.
         let e3 = Expression::parse("self.speed").unwrap();
         assert!(e3.execute(&HashMap::new()).is_err());
+    }
+
+    #[test]
+    fn self_method_calls_dispatch_through_classdb() {
+        use crate::object::class_db::{self, CallCtx};
+        use crate::object::Object;
+
+        fn twice(ctx: &CallCtx) -> Result<Variant, class_db::CallError> {
+            Ok(Variant::Int(ctx.args[0].to_int() * 2))
+        }
+
+        class_db::register_class("ExprCallObj", None);
+        class_db::bind_method("ExprCallObj", "twice", 1, twice);
+        let obj = Object::new();
+        class_db::bind_instance(obj.id(), "ExprCallObj");
+
+        let e = Expression::parse("self.twice(21)").unwrap();
+        let mut map = HashMap::new();
+        map.insert("self".to_string(), Variant::Object(obj.id()));
+        assert_eq!(e.execute(&map).unwrap(), Variant::Int(42));
+
+        // Wrong arity is an error.
+        let bad = Expression::parse("self.twice()").unwrap();
+        assert!(bad.execute(&map).is_err());
+        // Calling a method on a non-object is an error.
+        let bad2 = Expression::parse("x.twice(1)").unwrap();
+        let mut m2 = HashMap::new();
+        m2.insert("x".to_string(), Variant::Int(1));
+        assert!(bad2.execute(&m2).is_err());
     }
 
     #[test]
