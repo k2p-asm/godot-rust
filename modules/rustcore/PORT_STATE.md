@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1434 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1440 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -197,6 +197,8 @@ um_int64`/
 um_uint64`) | bases 2-36, INT64_MIN, u64::MAX; plus 
 um_float` (fixed decimals, zero trimming, `-0.0`, inf/nan, 16-decimal cap, half-to-even rounding). **Non-differential** (see note 3) |
 | `math/fieldwise.rs` | `core/math/math_fieldwise.cpp` | `fieldwise_assign` over 14 variant types (Vector2..Transform3D), type-mismatch and unknown-field no-ops. **Non-differential** (engine code is `#ifdef DEBUG_ENABLED`) |
+| `scene/skeleton_ik_3d.rs` | `scene/3d/skeleton_ik_3d.*` (state) | Root/tip bones, target transform and node-path override, tip-basis override, magnet position/flag, min distance, max iterations, influence (with the deprecated interpolation aliases) and the `start`/`stop` active flag including the one-time start. FABRIK/chain solving not ported. **Non-differential** |
+| `scene/color_picker_button.rs` | `scene/gui/color_picker.*` (`ColorPickerButton` state) | Picker colour (opaque black default), alpha/intensity editing flags and the popup bookkeeping helper. Popup/picker objects and drawing not ported. **Non-differential** |
 | `scene/canvas_group.rs` | `scene/2d/canvas_group.*` (state) | Fit margin 10, clear margin 10, mipmaps off with the full accessor surface. Rendering/server group not ported. **Non-differential** |
 | `scene/compressed_texture.rs` | `scene/resources/compressed_texture.*` (state) | The `DataFormat`/`LayeredType` enums, `FORMAT_VERSION` and the `FORMAT_BIT_*` constants, and the 2D/layered/3D resources' path, size, format, layers/mipmaps, depth and texture RIDs. `load` remembers the path but needs the pending `Image` port, so it reports false; decoded sizes are fed through port helpers. **Non-differential** |
 | `scene/gui_foldable.rs` | `scene/gui/foldable_container.*` (state) | FoldableContainer's folded flag, title/language/text direction/alignment/overrun/title position, and FoldableGroup membership with the single-expanded rule (unfolding reports the previous container to fold) and `allow_folding_all`. Drawing/shaping not ported. **Non-differential** |
