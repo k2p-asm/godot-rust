@@ -7,6 +7,7 @@ pub mod convex_hull;
 pub mod color_names;
 pub mod delaunay_3d;
 pub mod disjoint_set;
+pub mod dynamic_bvh;
 pub mod face3;
 pub mod fieldwise;
 pub mod funcs;
