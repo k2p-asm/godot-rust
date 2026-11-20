@@ -13,6 +13,7 @@ pub mod packed_data_container;
 pub mod json_native;
 pub mod path_utils;
 pub mod plist;
+pub mod resource_loader;
 pub mod resource_uid;
 pub mod stream_peer;
 pub mod translation_loader_po;
