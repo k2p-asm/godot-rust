@@ -61,7 +61,7 @@ git push origin rust-port
 
 ## Verified state (last run)
 
-- `cargo test`: **1440 unit tests + 34 differential tests, 0 failures.**
+- `cargo test`: **1454 unit tests + 34 differential tests, 0 failures.**
 - Differential coverage: Vector2, Vector2i-level ops, Vector3, scalar math
   (30+ functions), RandomPCG stream, AABB, Plane, Rect2, Basis, Quaternion,
   Transform3D, all six Euler orders (round-trip and arbitrary rotations),
@@ -197,6 +197,9 @@ um_int64`/
 um_uint64`) | bases 2-36, INT64_MIN, u64::MAX; plus 
 um_float` (fixed decimals, zero trimming, `-0.0`, inf/nan, 16-decimal cap, half-to-even rounding). **Non-differential** (see note 3) |
 | `math/fieldwise.rs` | `core/math/math_fieldwise.cpp` | `fieldwise_assign` over 14 variant types (Vector2..Transform3D), type-mismatch and unknown-field no-ops. **Non-differential** (engine code is `#ifdef DEBUG_ENABLED`) |
+| `audio/effects_filter.rs` | `servers/audio/effects/audio_effect_filter.*` | `AudioEffectFilter` (cutoff clamped to ≥1 Hz, resonance, gain, mode, 6/12/18/24 dB slope as `db + 1` serial sections) and the seven mode subclasses, processing each channel through up to four `AudioFilterSW` processors. Tests cover defaults/clamp, the slope/stage mapping, subclass modes, low-pass band behaviour and the steeper chain. **Non-differential** |
+| `audio/effects_hard_limiter.rs` | `servers/audio/effects/audio_effect_hard_limiter.*` | The look-ahead limiter: pre-gain, ceiling, 2 ms attack/sustain windows, delayed sample ring, release/attack gain interpolation and the per-bucket minimum gain. Tests cover defaults, instance sizing/latency, silence, ceiling limiting after the delay and pre-gain. **Non-differential** |
+| `audio/stream_generator.rs` | `servers/audio/effects/audio_stream_generator.*` | `AudioStreamGenerator` (mix-rate mode with the index guard, custom rate 44100, buffer length 0.5, `"UserFeed"`, zero length, monophonic) and the playback ring buffer sized to the next power of two with `push_frame`/`push_buffer`/`can_push_buffer`/`get_frames_available`/`clear_buffer` and a port-side drain. Tests cover defaults, mode guards, capacities, full-buffer behaviour and all-or-nothing pushes. **Non-differential** |
 | `scene/skeleton_ik_3d.rs` | `scene/3d/skeleton_ik_3d.*` (state) | Root/tip bones, target transform and node-path override, tip-basis override, magnet position/flag, min distance, max iterations, influence (with the deprecated interpolation aliases) and the `start`/`stop` active flag including the one-time start. FABRIK/chain solving not ported. **Non-differential** |
 | `scene/color_picker_button.rs` | `scene/gui/color_picker.*` (`ColorPickerButton` state) | Picker colour (opaque black default), alpha/intensity editing flags and the popup bookkeeping helper. Popup/picker objects and drawing not ported. **Non-differential** |
 | `scene/canvas_group.rs` | `scene/2d/canvas_group.*` (state) | Fit margin 10, clear margin 10, mipmaps off with the full accessor surface. Rendering/server group not ported. **Non-differential** |

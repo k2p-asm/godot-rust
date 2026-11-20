@@ -324,6 +324,13 @@ impl FilterProcessor {
         }
     }
 
+    /// Public single-sample entry point (the engine's `process_one` is inline
+    /// and used by the effect chain).
+    #[inline]
+    pub fn process_sample(&mut self, sample: f32) -> f32 {
+        self.process_one(sample)
+    }
+
     /// `process_one`.
     #[inline]
     fn process_one(&mut self, sample: f32) -> f32 {
