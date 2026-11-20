@@ -23,6 +23,8 @@ pub mod canvas_item;
 pub mod canvas_item_material;
 pub mod compositor;
 pub mod control;
+pub mod physics_body_exceptions;
+pub mod collision_polygon;
 pub mod gpu_particles_collision;
 pub mod kinematic_collision;
 pub mod primitive_meshes;
