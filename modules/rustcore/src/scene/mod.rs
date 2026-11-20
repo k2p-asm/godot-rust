@@ -68,5 +68,6 @@ pub mod tile_set;
 pub mod timer;
 pub mod velocity_tracker_3d;
 pub mod visible_on_screen_notifier_2d;
+pub mod visible_on_screen_notifier_3d;
 pub mod world_environment;
 pub mod visual_instance_3d;
